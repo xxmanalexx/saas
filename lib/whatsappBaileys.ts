@@ -159,10 +159,10 @@ export async function getOrCreateSocket(
       if (!rawText && !m.message?.imageMessage && !m.message?.videoMessage) continue;
 
       const incoming: WhatsAppIncomingMessage = {
-        remoteJid: jid,
+        remoteJid: rawJid,
         fromMe: Boolean(m.key?.fromMe),
         messageId: m.key?.id ?? "",
-        text,
+        text: rawText,
         pushName: m.pushName ?? null,
         timestamp: Number(m.messageTimestamp ?? 0),
       };

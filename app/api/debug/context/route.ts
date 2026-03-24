@@ -18,13 +18,13 @@ export async function GET(req: NextRequest) {
   }
 
   // Resolve workspace
-  let resolvedWorkspaceId = workspaceId;
+  let resolvedWorkspaceId: string | null = workspaceId ?? null;
   if (!resolvedWorkspaceId) {
     const ws = await db.workspace.findFirst({
       where: { userId: session!.user.id },
       select: { id: true },
     });
-    resolvedWorkspaceId = ws?.id;
+    resolvedWorkspaceId = ws?.id ?? null;
   }
   if (!resolvedWorkspaceId) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
