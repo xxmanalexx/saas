@@ -48,6 +48,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Delete messages and transcript first, then conversation
+  await db.message.deleteMany({ where: { conversationId: id } });
+  await db.transcript.deleteMany({ where: { conversationId: id } });
   await db.conversation.delete({ where: { id } });
+
   return NextResponse.json({ success: true });
 }
