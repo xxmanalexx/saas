@@ -149,12 +149,14 @@ export async function getOrCreateSocket(
     for (const msg of messages) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const m = msg as any;
+
+      const rawJid = m.key?.remoteJid ?? "";
+      const rawText = extractText(m.message);
+      const msgTypes = Object.keys(m.message ?? {}).join(",");
+      console.log(`[Baileys] msg upsert | jid="${rawJid}" | text="${rawText}" | types="${msgTypes}" | fromMe=${m.key?.fromMe}`);
+
       if (m.key?.fromMe) continue;
-
-      const jid: string = m.key?.remoteJid ?? "";
-      const text: string = extractText(m.message);
-
-      if (!text && !m.message?.imageMessage && !m.message?.videoMessage) continue;
+      if (!rawText && !m.message?.imageMessage && !m.message?.videoMessage) continue;
 
       const incoming: WhatsAppIncomingMessage = {
         remoteJid: jid,

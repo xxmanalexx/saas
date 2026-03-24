@@ -25,16 +25,25 @@ export async function POST(req: NextRequest) {
         // ── AI message processing ─────────────────────────────────────────
         try {
           const { remoteJid, text, pushName, messageId } = incoming;
-          if (!text || !remoteJid) return;
 
-          // Ignore group chats — only respond to direct messages
-          if (remoteJid.endsWith("@g.us")) {
-            console.log(`[WhatsApp] Ignoring group message: ${remoteJid}`);
+          console.log(`[WhatsApp] raw incoming | jid="${remoteJid}" | text="${text}" | fromMe=${incoming.fromMe}`);
+
+          if (!text || !remoteJid) {
+            console.log(`[WhatsApp] Skipping: missing text or jid`);
             return;
           }
 
-          // Determine contact identifier (phone number from WhatsApp JID)
+          // ── Group filter ────────────────────────────────────────────────
+          // WhatsApp group JIDs always contain @g.us
+          const isGroup = remoteJid.includes("@g.us");
+          if (isGroup) {
+            console.log(`[WhatsApp] BLOCKED group message from ${remoteJid} — not responding`);
+            return;
+          }
+
+          // ── DMs only from here ─────────────────────────────────────────
           const contactIdentifier = remoteJid.replace("@s.whatsapp.net", "");
+          console.log(`[WhatsApp] Processing DM from ${contactIdentifier}`);
 
           // Process through AI agents + Ollama
           const result = await processMessage({
@@ -49,6 +58,8 @@ export async function POST(req: NextRequest) {
             content: text,
           });
 
+          console.log(`[WhatsApp] AI response: "${result.response.slice(0, 80)}" | agent=${result.agentUsed}`);
+
           // Send AI response back to WhatsApp
           if (result.response) {
             await sendWhatsAppMessage(remoteJid, result.response);
@@ -61,7 +72,7 @@ export async function POST(req: NextRequest) {
               input: { content: text, messageId },
               output: { response: result.response, agent: result.agentUsed },
             },
-          });
+          }).catch(() => {});
         } catch (err) {
           console.error("[WhatsApp] message processing error:", err);
         }
