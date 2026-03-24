@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
           const { remoteJid, text, pushName, messageId } = incoming;
           if (!text || !remoteJid) return;
 
+          // Ignore group chats — only respond to direct messages
+          if (remoteJid.endsWith("@g.us")) {
+            console.log(`[WhatsApp] Ignoring group message: ${remoteJid}`);
+            return;
+          }
+
           // Determine contact identifier (phone number from WhatsApp JID)
           const contactIdentifier = remoteJid.replace("@s.whatsapp.net", "");
 
