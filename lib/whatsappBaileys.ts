@@ -10,8 +10,9 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
 } from "baileys";
-import type { BaileysEventMap, ConnectionState, WAMessage } from "baileys";
+import type { BaileysEventMap, ConnectionState } from "baileys";
 import qrcode from "qrcode";
+import pino from "pino";
 import { mkdirSync, existsSync, rmSync } from "fs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -86,11 +87,13 @@ export async function getOrCreateSocket(
   const { state, saveCreds } = await getAuthState(workspaceId);
   const { version } = await fetchLatestBaileysVersion();
 
+  const logger = pino({ level: "silent" as const });
+
   socket = makeWASocket({
     version,
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys) },
+    logger,
     printQRInTerminal: false,
-    logger: undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     getMessage: async () => ({ conversation: "placeholder" } as any),
   });
