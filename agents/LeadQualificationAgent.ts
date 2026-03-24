@@ -1,51 +1,22 @@
 import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
 import { db } from "@/lib/db";
-import type { Contact, Lead } from "@prisma/client";
+import type { Contact } from "@prisma/client";
 
 export interface QualificationResult {
-  score: number; // 0-100
+  score: number;
   stage: "NEW" | "CONTACTED" | "QUALIFIED";
   responses: Record<string, string>;
   summary: string;
   suggestedAction: "call" | "email" | "book" | "nurture" | "discard";
 }
 
-interface LeadQualConfig {
-  workspaceId: string;
-  qualificationQuestions: string[];
-  scoreThresholds: { hot: number; warm: number; cold: number };
-}
-
-const DEFAULT_QUAL_QUESTIONS = [
+const QUAL_QUESTIONS = [
   "What business are you in?",
   "What's your main challenge right now?",
   "What's your budget range?",
   "When are you looking to get started?",
   "What's the best way to reach you?",
 ];
-
-const SCORING_KEYWORDS: Record<string, number> = {
-  // Positive signals
-  "asap": 15, "immediately": 15, "urgent": 15,
-  "ready to buy": 20, "ready today": 20, "sign up now": 20,
-  "budget": 10, "have budget": 15, " allocated": 10,
-  "decision maker": 15, "i decide": 10, "owner": 10,
-  "big": 8, "large": 8, "enterprise": 12, "scale": 8,
-  "mena": 5, "dubai": 5, "saudi": 5, "UAE": 5,
-  // Negative signals
-  "maybe": -5, "sometime": -5, "not sure": -8,
-  "just looking": -10, "browsing": -8, "thinking": -5,
-  "cheap": -5, "free": -8, "trial": -3,
-};
-
-function scoreMessage(text: string): number {
-  const lower = text.toLowerCase();
-  let score = 0;
-  for (const [keyword, value] of Object.entries(SCORING_KEYWORDS)) {
-    if (lower.includes(keyword)) score += value;
-  }
-  return Math.max(0, Math.min(100, score));
-}
 
 export async function leadQualificationAgent(
   workspaceId: string,
@@ -55,110 +26,115 @@ export async function leadQualificationAgent(
   aiOpts?: AiOptions,
   knowledgeContext?: string,
   personaContext?: string,
-  config?: Partial<LeadQualConfig>
 ): Promise<QualificationResult & { response: string }> {
-  const questions = config?.qualificationQuestions ?? DEFAULT_QUAL_QUESTIONS;
-
-  // Get existing lead if any
+  // Get existing lead
   const existingLead = await db.lead.findFirst({
     where: { workspaceId, contactId: contact.id },
-    include: { contact: true },
   });
 
-  // Score the incoming message
-  const messageScore = scoreMessage(incomingMessage);
-  const historyScore = conversationHistory
-    .filter((m) => m.role === "user")
-    .reduce((sum, m) => sum + scoreMessage(m.content), 0);
-
-  const totalScore = Math.min(
-    100,
-    (existingLead?.score ?? 0) + messageScore + Math.round(historyScore / 3)
-  );
-
   const answeredCount = existingLead
-    ? Object.keys(JSON.parse(JSON.stringify(existingLead))?.notes ?? "{}").length
+    ? Object.keys(JSON.parse(JSON.stringify(existingLead.notes ?? "{}"))).length
     : 0;
+  const nextQuestion = QUAL_QUESTIONS[answeredCount] ?? null;
 
-  // Determine next question
-  const nextQuestionIndex = answeredCount;
-  const nextQuestion = questions[nextQuestionIndex] ?? null;
-
-  // Build response
-  let response: string;
-  let suggestedAction: QualificationResult["suggestedAction"] = "nurture";
-
+  // ── Continue qualification flow ─────────────────────────────────────────────
   if (nextQuestion) {
-    // Continue qualification flow
-    response = `Thanks for your message! To help me connect you with the right solution, could you tell me: ${nextQuestion}`;
-  } else {
-    // Qualification complete
-    const stage =
-      totalScore >= (config?.scoreThresholds?.hot ?? 60)
-        ? "QUALIFIED"
-        : totalScore >= (config?.scoreThresholds?.warm ?? 30)
-        ? "CONTACTED"
-        : "NEW";
-
-    response = buildSummaryResponse(totalScore, stage);
-    suggestedAction =
-      stage === "QUALIFIED"
-        ? "book"
-        : stage === "CONTACTED"
-        ? "call"
-        : "nurture";
-  }
-
-  // Update lead
-  const leadData = {
-    score: totalScore,
-    stage: existingLead?.stage ?? ("NEW" as const),
-    notes: existingLead?.notes
-      ? JSON.parse(existingLead.notes as string)
-      : {},
-  };
-  leadData.notes[incomingMessage.slice(0, 100)] = incomingMessage;
-
-  const lead = existingLead
-    ? await db.lead.update({
+    // Persist user's answer
+    if (existingLead) {
+      const notes = JSON.parse(existingLead.notes as string ?? "{}");
+      notes[incomingMessage.slice(0, 80)] = incomingMessage;
+      await db.lead.update({
         where: { id: existingLead.id },
-        data: { score: totalScore, notes: JSON.stringify(leadData.notes) },
-      })
-    : await db.lead.create({
+        data: { notes: JSON.stringify(notes) },
+      });
+    } else {
+      await db.lead.create({
         data: {
           workspaceId,
           contactId: contact.id,
-          score: totalScore,
+          score: 0,
           stage: "NEW",
-          notes: JSON.stringify(leadData.notes),
+          notes: JSON.stringify({ [incomingMessage.slice(0, 80)]: incomingMessage }),
         },
       });
+    }
 
-  // Log qualification event
-  await db.leadEvent.create({
-    data: {
-      leadId: lead.id,
-      type: "qualification_update",
-      data: { score: totalScore, message: incomingMessage.slice(0, 200) },
-    },
-  });
+    const prompt = `The customer said: "${incomingMessage}"
+
+Ask them naturally: ${nextQuestion}
+Keep the conversation flowing — don't repeat questions they've already answered.`;
+
+    const systemPrompt =
+      `You are a lead qualification agent.` +
+      (personaContext ?? "") +
+      (knowledgeContext ?? "") +
+      `\n\nYour job is to qualify the lead by asking up to 5 key questions.
+Ask one question at a time. Be friendly and conversational.
+After 3+ answers, make a judgment and give a recommendation.`;
+
+    const messages: AiMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...conversationHistory.slice(-8),
+      { role: "user", content: prompt },
+    ];
+
+    const result = await aiComplete(messages, aiOpts);
+
+    return {
+      score: existingLead?.score ?? 0,
+      stage: "NEW",
+      responses: {},
+      summary: "In qualification flow",
+      suggestedAction: "nurture",
+      response: result.content,
+    };
+  }
+
+  // ── Qualification complete — AI makes a final recommendation ───────────────
+  const systemPrompt =
+    `You are a lead qualification agent for Rana.` +
+    (personaContext ?? "") +
+    (knowledgeContext ?? "") +
+    `\n\nBased on the customer's previous answers, determine:
+1. Their fit score: HOT (ready to buy, clear budget, timeline), WARM (interested, timeline vague), COLD (early stage, exploring)
+2. Recommended next action: book (for HOT), call (for WARM), nurture (for COLD)
+3. A brief summary of their needs
+
+Respond ONLY as JSON with fields: score (0-100), stage (HOT|WARM|COLD), summary (1 sentence), suggestedAction (book|call|nurture), response (what to tell the customer — be friendly and natural).`;
+
+  const messages: AiMessage[] = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory.slice(-12),
+    { role: "user", content: "Based on the above conversation, provide the qualification result as JSON." },
+  ];
+
+  const result = await aiComplete(messages, aiOpts);
+
+  let parsed: { score: number; stage: string; suggestedAction: string; summary: string; response: string } = {
+    score: 50, stage: "WARM", suggestedAction: "nurture", summary: "", response: result.content,
+  };
+  try {
+    const raw = JSON.parse(result.content);
+    parsed = { score: parsed.score, stage: raw.stage ?? "WARM", suggestedAction: raw.suggestedAction ?? "nurture", summary: raw.summary ?? "", response: raw.response ?? result.content };
+  } catch { /* use defaults */ }
+
+  const stageMap: Record<string, "QUALIFIED" | "CONTACTED" | "NEW"> = {
+    HOT: "QUALIFIED", WARM: "CONTACTED", COLD: "NEW",
+  };
+  const dbStage = stageMap[parsed.stage] ?? "CONTACTED";
+  const responseAction = parsed.suggestedAction as "book" | "call" | "nurture";
+
+  if (existingLead) {
+    await db.lead.update({ where: { id: existingLead.id }, data: { score: parsed.score, stage: dbStage } });
+    await db.leadEvent.create({ data: { leadId: existingLead.id, type: "qualification_complete", data: { score: parsed.score, stage: parsed.stage } } });
+  }
 
   return {
-    score: totalScore,
-    stage: "QUALIFIED" as const,
-    responses: leadData.notes,
-    summary: `Lead scored ${totalScore}/100`,
-    suggestedAction,
-    response,
+    score: parsed.score,
+    stage: dbStage,
+    responses: JSON.parse(existingLead?.notes as string ?? "{}"),
+    summary: parsed.summary,
+    suggestedAction: responseAction,
+    response: parsed.response,
   };
-}
-
-function buildSummaryResponse(score: number, stage: string): string {
-  if (stage === "QUALIFIED" || score >= 60) {
-    return `Great — based on what you've shared, you sound like a strong fit. I'd love to set up a quick call to walk you through how Rana can help your business. When works best for you?`;
-  }
-  if (stage === "CONTACTED" || score >= 30) {
-    return `Thanks for reaching out! I'll pass your details to our team and someone will be in touch soon. In the meantime, feel free to explore our website.`;
-  }
-  return `Thanks for your interest! We'll be in touch when the time is right for you.`;
 }

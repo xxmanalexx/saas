@@ -9,15 +9,6 @@ export interface SupportResult {
   escalate: boolean;
 }
 
-const FAQ_ANSWERS: Record<string, string> = {
-  "pricing": "Rana offers three plans: Starter at $49/mo, Growth at $149/mo, and Enterprise at $499/mo. All plans include our AI agents. Want me to walk you through which fits your business?",
-  "demo": "Happy to arrange a demo! Can you share your preferred time and timezone?",
-  "cancel": "I can help you manage your subscription. Would you like to pause, downgrade, or cancel entirely?",
-  "refund": "Our refund policy allows cancellations within 7 days of billing. I'll flag this for our team — someone will be in touch within 24 hours.",
-  "hours": "We operate Monday to Friday, 9 AM to 6 PM (UAE time). Outside hours, our AI handles everything — urgent issues can be escalated.",
-  "integration": "Rana connects with WhatsApp, Instagram, web chat, email, HubSpot, Zoho, Pipedrive, Cal.com, and Stripe. Which would you like to set up?",
-};
-
 export async function supportAgent(
   workspaceId: string,
   contact: Contact,
@@ -30,21 +21,40 @@ export async function supportAgent(
 ): Promise<SupportResult & { response: string }> {
   const lowerMsg = incomingMessage.toLowerCase();
 
-  // Keyword-based FAQ matching
+  // ── Keyword FAQ using knowledge base ──────────────────────────────────────
+  if (knowledgeContext) {
+    const kbLines = knowledgeContext.split("\n").filter(Boolean);
+    // Try to find a matching KB entry by keyword proximity
+    const msgWords = lowerMsg.split(/\s+/);
+    for (const line of kbLines) {
+      if (line.startsWith("[") && line.includes("]")) {
+        const tagMatch = line.match(/\[(\w+)\]/);
+        const tag = tagMatch?.[1] ?? "";
+        const content = kbLines[kbLines.indexOf(line) + 1] ?? "";
+        if (msgWords.some((w: string) => w.length > 3 && content.toLowerCase().includes(w))) {
+          return {
+            resolved: true,
+            category: tag,
+            response: content.trim(),
+            escalate: false,
+          };
+        }
+      }
+    }
+  }
+
+  // ── Keyword fallback answers ───────────────────────────────────────────────
+  const FAQ_ANSWERS: Record<string, string> = {
+    pricing: "Rana has three plans: Starter $49/mo, Growth $149/mo, Enterprise $499/mo. Want me to help you find the right fit?",
+    demo: "Happy to arrange a demo! What time and timezone works best for you?",
+    cancel: "I can help with that. Would you like to pause, downgrade, or cancel?",
+    refund: "We offer a 14-day money-back guarantee. I'll flag this for our team — someone will reach out within 24 hours.",
+    hours: "We're available Sunday–Thursday, 9 AM to 6 PM GST. Outside hours, our AI handles everything!",
+    integration: "Rana connects with WhatsApp, Instagram, web chat, email, HubSpot, Zoho, Pipedrive, and Cal.com. Which would you like to set up?",
+  };
+
   for (const [keyword, answer] of Object.entries(FAQ_ANSWERS)) {
     if (lowerMsg.includes(keyword)) {
-      // Try to attach to existing lead
-      const leadId = await getLeadId(workspaceId, contact.id);
-      if (leadId) {
-        await db.leadEvent.create({
-          data: {
-            leadId,
-            type: "support_faq",
-            data: { keyword, question: incomingMessage },
-          },
-        }).catch(() => {});
-      }
-
       return {
         resolved: true,
         category: keyword,
@@ -54,29 +64,29 @@ export async function supportAgent(
     }
   }
 
-  // Fallback: AI-powered response
-  const systemPrompt = `You are a helpful customer support agent for Rana, an AI platform for MENA businesses.
-Answer questions about: pricing, demos, integrations, billing, cancellations, refunds, and general product questions.
-Be friendly, concise, and professional.
-If you don't know something, say you'll escalate to the team.
-Never make up pricing or facts — stick to what's provided in the conversation.`;
+  // ── AI-powered fallback ───────────────────────────────────────────────────
+  const systemPrompt =
+    `You are a customer support agent.` +
+    (personaContext ?? "") +
+    (knowledgeContext ?? "") +
+    `\n\nFollow these rules:
+- Only answer questions using information from the knowledge base above
+- If the knowledge base doesn't cover the question, say you'll escalate to the team
+- Be friendly, helpful, and concise
+- Never make up pricing, policies, or facts
+- In Arabic: respond in Arabic. In English: respond in English.`;
 
   const messages: AiMessage[] = [
     { role: "system", content: systemPrompt },
-    ...history.slice(-6),
+    ...history.slice(-6).map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: incomingMessage },
   ];
 
-  const response = await aiComplete(messages);
+  const response = await aiComplete(messages, aiOpts);
 
   return {
     resolved: false,
     response: response.content,
     escalate: false,
   };
-}
-
-async function getLeadId(workspaceId: string, contactId: string): Promise<string | null> {
-  const lead = await db.lead.findFirst({ where: { workspaceId, contactId } });
-  return lead?.id ?? null;
 }
