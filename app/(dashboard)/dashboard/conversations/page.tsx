@@ -63,8 +63,11 @@ export default function ConversationsPage() {
         fetch(`/api/conversations/${id}`, { method: "DELETE" })
       )
     );
-    setConversations((prev) => prev.filter((c) => !ids.includes(c.id)));
     setSelected(new Set());
+    // Re-fetch so new WhatsApp messages don't recreate deleted conversations in the list
+    const res = await fetch("/api/conversations");
+    const data = await res.json();
+    if (Array.isArray(data)) setConversations(data);
   };
 
   const allSelected = conversations.length > 0 && selected.size === conversations.length;
