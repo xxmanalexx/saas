@@ -23,4 +23,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
     error: "/login",
   },
+  events: {
+    async createUser({ user }) {
+      // Auto-create a default workspace for new users
+      if (user.id) {
+        await db.workspace.create({
+          data: {
+            name: "My Workspace",
+            userId: user.id,
+          },
+        });
+      }
+    },
+  },
 });

@@ -25,6 +25,8 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
   const [refreshKey, setRefreshKey] = useState(0);
   const [waStatus, setWaStatus] = useState<{ status: string; message?: string } | null>(null);
 
+  console.log("[IntegrationsClient] render | workspace:", workspace?.id ?? "NULL", "| showModal:", showModal);
+
   // Poll WhatsApp live status
   useEffect(() => {
     if (!workspace) return;
@@ -152,7 +154,10 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
                   View docs
                 </a>
                 <button
-                  onClick={() => setShowModal(channel)}
+                  onClick={() => {
+                    console.log("[Debug] Connect clicked for", channel, "| workspace:", workspace?.id ?? "NULL");
+                    setShowModal(channel);
+                  }}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
                     isConnected || isWaLive
                       ? "border border-[#E2E8F0] text-[#64748B] hover:bg-red-50 hover:text-red-600 hover:border-red-200"
