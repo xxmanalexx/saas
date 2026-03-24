@@ -4,6 +4,7 @@ import { leadQualificationAgent } from "@/agents/LeadQualificationAgent";
 import { supportAgent } from "@/agents/SupportAgent";
 import { bookingAgent } from "@/agents/BookingAgent";
 import { followUpAgent } from "@/agents/FollowUpAgent";
+import { getOllamaConfig } from "@/lib/ollamaConfig";
 import type { AiMessage } from "@/lib/ai";
 import type { Channel, Conversation, Contact } from "@prisma/client";
 import type { AgentType } from "@prisma/client";
@@ -11,7 +12,7 @@ import type { AgentType } from "@prisma/client";
 export interface ProcessMessageInput {
   workspaceId: string;
   channel: Channel;
-  channelId: string; // WhatsApp number, IG username, web chat session ID, email
+  channelId: string;
   contactIdentifier: string;
   contactProfile: Record<string, string>;
   content: string;
@@ -31,6 +32,37 @@ export async function processMessage(
 ): Promise<ProcessMessageResult> {
   const start = Date.now();
   const { workspaceId, channel, channelId, contactIdentifier, contactProfile, content } = input;
+
+  // ── 0. Load workspace AI config + knowledge base + persona in parallel ──────
+  const [ollamaCfg, kbEntries, persona] = await Promise.all([
+    getOllamaConfig(workspaceId),
+    db.knowledgeBase.findMany({
+      where: { workspaceId, isActive: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.agentPersona.findFirst({
+      where: { workspaceId, isDefault: true },
+    }),
+  ]);
+
+  // Build knowledge base context string
+  const knowledgeContext = kbEntries.length > 0
+    ? "\n\n--- BUSINESS KNOWLEDGE BASE ---\n" +
+      kbEntries.map((e) => `[${e.category.toUpperCase()}] ${e.title}\n${e.content}`).join("\n\n") +
+      "\n--- END KNOWLEDGE BASE ---"
+    : "";
+
+  // Build persona context string
+  const personaContext = persona
+    ? `\n\n--- AGENT PERSONA ---\n` +
+      `Name: ${persona.name}\n` +
+      `Role: ${persona.role}\n` +
+      `Tone: ${persona.tone}\n` +
+      `Language: ${persona.language}\n` +
+      `Emoji style: ${persona.emojiStyle}\n` +
+      (persona.instructions ? `Custom instructions: ${persona.instructions}\n` : "") +
+      `--- END PERSONA ---`
+    : "";
 
   // ── 1. Get or create contact ──────────────────────────────────────────────
   const contact = await db.contact.upsert({
@@ -65,7 +97,7 @@ export async function processMessage(
     },
   });
 
-  // ── 3. Load conversation history ──────────────────────────────────────────
+  // ── 3. Load conversation history ─────────────────────────────────────────
   const historyRows = await db.message.findMany({
     where: { conversationId: conversation.id },
     orderBy: { createdAt: "asc" },
@@ -79,11 +111,12 @@ export async function processMessage(
   // ── 4. Check for escalation triggers ─────────────────────────────────────
   const escalateCheck = await shouldEscalate(content, history);
   if (escalateCheck.escalate) {
+    const escalationMsg = "Of course — let me connect you with our team. Someone will be in touch shortly.";
     await db.message.create({
       data: {
         conversationId: conversation.id,
         role: "ASSISTANT",
-        content: "Of course — let me connect you with our team. Someone will be in touch shortly.",
+        content: escalationMsg,
         metadata: { reason: escalateCheck.reason },
       },
     });
@@ -92,7 +125,7 @@ export async function processMessage(
       data: { status: "ESCALATED" },
     });
     return {
-      response: "Of course — let me connect you with our team. Someone will be in touch shortly.",
+      response: escalationMsg,
       agentUsed: "ROUTER",
       escalated: true,
       latencyMs: Date.now() - start,
@@ -100,7 +133,16 @@ export async function processMessage(
   }
 
   // ── 5. Route to appropriate agent ─────────────────────────────────────────
-  const routing = await routerAgent(workspaceId, content, history);
+  const aiOpts = { ollamaUrl: ollamaCfg.ollamaUrl, model: ollamaCfg.ollamaModel };
+
+  const routing = await routerAgent(
+    workspaceId,
+    content,
+    history,
+    aiOpts,
+    knowledgeContext,
+    personaContext
+  );
 
   let agentResponse: string;
   let agentType: AgentType = routing.agentType;
@@ -112,10 +154,12 @@ export async function processMessage(
         workspaceId,
         contact,
         content,
-        history
+        history,
+        aiOpts,
+        knowledgeContext,
+        personaContext
       );
       agentResponse = result.response;
-      // Get lead ID
       const lead = await db.lead.findFirst({ where: { workspaceId, contactId: contact.id } });
       leadId = lead?.id;
       break;
@@ -127,7 +171,10 @@ export async function processMessage(
         contact,
         conversation,
         content,
-        history
+        history,
+        aiOpts,
+        knowledgeContext,
+        personaContext
       );
       agentResponse = result.response;
       break;
@@ -139,7 +186,10 @@ export async function processMessage(
         contact,
         conversation,
         content,
-        history
+        history,
+        aiOpts,
+        knowledgeContext,
+        personaContext
       );
       agentResponse = result.response;
       break;
@@ -147,7 +197,6 @@ export async function processMessage(
 
     default:
     case "ROUTER": {
-      // Generic fallback response
       agentResponse =
         "Got your message! I'm here to help. Could you give me a bit more detail so I can point you in the right direction?";
       break;

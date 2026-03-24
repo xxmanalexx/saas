@@ -1,4 +1,4 @@
-import { aiComplete, type AiMessage } from "@/lib/ai";
+import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
 import { db } from "@/lib/db";
 import type { Contact, Conversation } from "@prisma/client";
 import { aiCompleteSimple } from "@/lib/ai";
@@ -36,6 +36,9 @@ export async function bookingAgent(
   conversation: Conversation,
   incomingMessage: string,
   history: AiMessage[],
+  aiOpts?: AiOptions,
+  knowledgeContext?: string,
+  personaContext?: string,
   config?: Partial<BookingConfig>
 ): Promise<BookingResult & { response: string }> {
   const cfg = { ...DEFAULT_BOOKING_CONFIG, ...config };

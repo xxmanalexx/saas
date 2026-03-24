@@ -1,33 +1,25 @@
-import { aiComplete, type AiMessage } from "@/lib/ai";
-import { db } from "@/lib/db";
+import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
 import type { AgentType } from "@prisma/client";
 
 export interface RouterDecision {
   intent: string;
-  confidence: number; // 0-1
+  confidence: number;
   agentType: AgentType;
   reasoning: string;
 }
 
 const INTENT_PROMPTS: Record<string, string> = {
-  // Lead qualification triggers
   new_inquiry: "Customer is asking about product, pricing, or getting started",
   demo_request: "Customer explicitly wants a demo or to speak with sales",
-  
-  // Booking triggers
   book_appointment: "Customer wants to book a call, meeting, or appointment",
   check_availability: "Customer is asking about available times",
-  
-  // Support triggers
   ask_help: "Customer is asking for help with something",
   technical_support: "Customer has a technical issue or bug",
   refund_request: "Customer is asking about refunds or cancellations",
   complaint: "Customer is expressing frustration or complaining",
-  
-  // General
   general: "General conversation, not clearly one of the above",
   escalate: "Customer explicitly wants a human / real person / supervisor",
-  out_of_scope: "Customer is asking something we cannot or should not handle",
+  out_of_scope: "Customer is asking something completely unrelated",
 };
 
 const AGENT_ROUTING: Record<string, AgentType> = {
@@ -40,43 +32,42 @@ const AGENT_ROUTING: Record<string, AgentType> = {
   refund_request: "SUPPORT",
   complaint: "SUPPORT",
   general: "LEAD_QUALIFICATION",
-  escalate: "ROUTER", // Router handles escalation — calls human
+  escalate: "ROUTER",
   out_of_scope: "ROUTER",
 };
 
 export async function routerAgent(
   workspaceId: string,
   message: string,
-  conversationHistory: AiMessage[]
+  conversationHistory: AiMessage[],
+  aiOpts?: AiOptions,
+  knowledgeContext?: string,
+  personaContext?: string
 ): Promise<RouterDecision> {
-  const systemPrompt = `You are the Router Agent for Rana, an AI customer service platform for MENA businesses.
-Your job is to classify the customer's intent from their latest message and route them to the correct specialist agent.
+  const systemPrompt =
+    `You are the Router Agent for Rana, an AI customer service platform for MENA businesses.` +
+    `Your job is to classify the customer's intent and route them to the correct specialist agent.` +
+    (knowledgeContext ?? "") +
+    (personaContext ?? "") +
+    `\n\nClassification categories:\n` +
+    Object.entries(INTENT_PROMPTS)
+      .map(([key, desc]) => `- ${key}: ${desc}`)
+      .join("\n") +
+    `\n\nImportant rules:
+- "escalate" takes highest priority — if customer says "real person", "human", "talk to agent", classify as escalate
+- "out_of_scope" only for completely unrelated messages (spam, personal messages)
+- "complaint" and "refund_request" route to SUPPORT
+- When in doubt, route to LEAD_QUALIFICATION
 
-Classification categories:
-${Object.entries(INTENT_PROMPTS)
-  .map(([key, desc]) => `- ${key}: ${desc}`)
-  .join("\n")}
-
-Important rules:
-- "escalate" takes highest priority — if customer says "real person", "human", "talk to agent", "supervisor", classify as escalate
-- "out_of_scope" only if the message is completely unrelated to the business (spam, personal messages, etc.)
-- "complaint" and "refund_request" route to SUPPORT — those agents know how to handle it
-
-Respond ONLY with a JSON object:
-{
-  "intent": "<one of the intent keys>",
-  "confidence": <0.0 to 1.0>,
-  "agentType": "<agent type enum>",
-  "reasoning": "<2-3 sentence explanation>"
-}`;
+Respond ONLY with a JSON object with keys: intent, confidence, agentType, reasoning`;
 
   const messages: AiMessage[] = [
     { role: "system", content: systemPrompt },
-    ...conversationHistory.slice(-6), // last 3 exchanges
+    ...conversationHistory.slice(-6),
     { role: "user", content: `Customer message to classify: "${message}"` },
   ];
 
-  const response = await aiComplete(messages);
+  const response = await aiComplete(messages, aiOpts);
 
   try {
     const parsed = JSON.parse(response.content) as RouterDecision;
@@ -85,7 +76,6 @@ Respond ONLY with a JSON object:
       agentType: AGENT_ROUTING[parsed.intent] ?? "ROUTER",
     };
   } catch {
-    // Fallback: safe default
     return {
       intent: "general",
       confidence: 0.5,
@@ -101,8 +91,8 @@ export async function shouldEscalate(
 ): Promise<{ escalate: boolean; reason?: string }> {
   const escalationKeywords = [
     "talk to a human", "real person", "human", "supervisor", "manager",
-    "投诉", "怒", "cancel my account", "refund now", "speak to someone",
-    "مشغل", "إنسان", "موظف", // Arabic triggers
+    "complaint", "怒", "cancel my account", "refund now", "speak to someone",
+    "مشغل", "إنسان", "موظف",
   ];
 
   const lowerMessage = message.toLowerCase();
@@ -112,6 +102,5 @@ export async function shouldEscalate(
     }
   }
 
-  // Sentiment-based escalation (future: add sentiment scoring here)
   return { escalate: false };
 }

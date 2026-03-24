@@ -72,6 +72,9 @@ model Workspace {
   name      String
   userId    String
   settings  Json     @default("{}")
+  // Ollama AI config
+  ollamaUrl  String   @default("http://localhost:11434")
+  ollamaModel String  @default("llama3.2")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -83,6 +86,8 @@ model Workspace {
   flows          Flow[]
   integrations   Integration[]
   transcripts    Transcript[]
+  knowledgeBase  KnowledgeBase[]
+  personas       AgentPersona[]
 }
 
 model Agent {
@@ -308,4 +313,58 @@ model AgentLog {
   createdAt DateTime @default(now())
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+// ─── Knowledge Base ────────────────────────────────────────────────────────────
+
+model KnowledgeBase {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  content     String   @db.Text
+  category    String   @default("general") // general, faq, pricing, policy, product
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ─── Agent Persona ─────────────────────────────────────────────────────────────
+
+model AgentPersona {
+  id          String      @id @default(cuid())
+  workspaceId String
+  name        String
+  role        PersonaRole @default(SUPPORT)
+  tone        PersonaTone @default(FRIENDLY)
+  language    String      @default("en") // en, ar, hi, fr, etc.
+  emojiStyle  EmojiStyle  @default(SOMETIMES)
+  instructions String    @db.Text @default("")
+  isDefault   Boolean     @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+enum PersonaRole {
+  RECEPTIONIST
+  MARKETER
+  SALES
+  SUPPORT
+  GENERAL
+}
+
+enum PersonaTone {
+  FRIENDLY
+  PROFESSIONAL
+  CASUAL
+  FORMAL
+}
+
+enum EmojiStyle {
+  NEVER
+  SOMETIMES
+  OFTEN
 }

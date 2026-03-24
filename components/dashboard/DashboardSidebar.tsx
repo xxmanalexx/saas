@@ -10,12 +10,14 @@ import {
   Settings,
   BarChart3,
   Zap,
+  BookOpen,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: BarChart3 },
   { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquare },
   { href: "/dashboard/leads", label: "Leads", icon: Users },
+  { href: "/dashboard/knowledge", label: "Knowledge Base", icon: BookOpen },
   { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp },
   { href: "/dashboard/integrations", label: "Integrations", icon: Plug },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

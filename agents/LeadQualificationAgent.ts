@@ -1,4 +1,4 @@
-import { aiComplete, type AiMessage } from "@/lib/ai";
+import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
 import { db } from "@/lib/db";
 import type { Contact, Lead } from "@prisma/client";
 
@@ -52,6 +52,9 @@ export async function leadQualificationAgent(
   contact: Contact,
   incomingMessage: string,
   conversationHistory: AiMessage[],
+  aiOpts?: AiOptions,
+  knowledgeContext?: string,
+  personaContext?: string,
   config?: Partial<LeadQualConfig>
 ): Promise<QualificationResult & { response: string }> {
   const questions = config?.qualificationQuestions ?? DEFAULT_QUAL_QUESTIONS;

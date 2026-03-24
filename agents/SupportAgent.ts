@@ -1,4 +1,4 @@
-import { aiComplete, type AiMessage } from "@/lib/ai";
+import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
 import { db } from "@/lib/db";
 import type { Contact, Conversation } from "@prisma/client";
 
@@ -24,6 +24,9 @@ export async function supportAgent(
   conversation: Conversation,
   incomingMessage: string,
   history: AiMessage[],
+  aiOpts?: AiOptions,
+  knowledgeContext?: string,
+  personaContext?: string,
 ): Promise<SupportResult & { response: string }> {
   const lowerMsg = incomingMessage.toLowerCase();
 
