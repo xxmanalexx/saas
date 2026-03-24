@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { redirect } from "next/navigation";
-import WhatsAppConfigModal from "@/components/integrations/WhatsAppConfigModal";
+import { useState, useEffect } from "react";
+import WhatsAppQRModal from "@/components/integrations/WhatsAppQRModal";
 
 interface Integration {
   id: string;
@@ -24,6 +23,26 @@ interface IntegrationsClientProps {
 export default function IntegrationsClient({ workspace, session }: IntegrationsClientProps) {
   const [showModal, setShowModal] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [waStatus, setWaStatus] = useState<{ status: string; message?: string } | null>(null);
+
+  // Poll WhatsApp live status
+  useEffect(() => {
+    if (!workspace) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/whatsapp/status`, {
+          headers: { "x-workspace-id": workspace.id },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setWaStatus(data);
+        }
+      } catch (_) {}
+    };
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [workspace, refreshKey]);
 
   const integrations = workspace?.integrations ?? [];
 
@@ -31,8 +50,8 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
     WHATSAPP: {
       label: "WhatsApp",
       icon: "📱",
-      description: "Connect your WhatsApp Business API to automate DMs",
-      docsUrl: "https://developers.facebook.com/docs/whatsapp",
+      description: "Connect via QR code — no Meta account needed",
+      docsUrl: "#",
     },
     INSTAGRAM: {
       label: "Instagram",
@@ -70,33 +89,17 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
       <h1 className="text-2xl font-bold text-[#0A0F1C] mb-1">Integrations</h1>
       <p className="text-[#64748B] mb-8">Connect your channels to start automating conversations</p>
 
-      {/* WhatsApp setup notice */}
-      <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200">
-        <p className="text-sm text-blue-800">
-          <span className="font-semibold">WhatsApp setup:</span> You need a Meta Business App with WhatsApp product enabled.
-          Follow the{" "}
-          <a
-            href="https://developers.facebook.com/docs/whatsapp/business-management-api/get-started"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:no-underline"
-          >
-            official guide
-          </a>{" "}
-          to get your Access Token, Phone Number ID, and Business Account ID.
-        </p>
-      </div>
-
       <div className="grid grid-cols-2 gap-5">
         {Object.entries(channelMeta).map(([channel, meta]) => {
           const connected = integrations.find((i) => i.channel === channel);
           const isConnected = connected?.status === "CONNECTED";
+          const isWaLive = channel === "WHATSAPP" && waStatus?.status === "connected";
 
           return (
             <div
               key={channel}
               className={`p-6 rounded-2xl border transition-colors ${
-                isConnected
+                isConnected || isWaLive
                   ? "bg-[#00C853]/5 border-[#00C853]/30"
                   : "bg-white border-[#E2E8F0]"
               }`}
@@ -113,6 +116,16 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
                   <span className="text-xs text-[#00C853] bg-[#00C853]/10 px-2 py-1 rounded-full font-medium">
                     Connected
                   </span>
+                ) : isWaLive ? (
+                  <span className="text-xs text-[#25D366] bg-[#25D366]/10 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
+                    Live
+                  </span>
+                ) : channel === "WHATSAPP" && waStatus?.status === "connecting" ? (
+                  <span className="text-xs text-[#25D366] bg-[#25D366]/10 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#25D366] animate-pulse" />
+                    Connecting
+                  </span>
                 ) : (
                   <span className="text-xs text-[#94A3B8] bg-[#F1F5F9] px-2 py-1 rounded-full">
                     Not connected
@@ -120,9 +133,12 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
                 )}
               </div>
 
-              {isConnected && connected && (
-                <div className="mb-3 p-2 rounded-lg bg-white/60 text-xs text-[#64748B]">
-                  ID: {connected.id.slice(0, 12)}... · {connected.status}
+              {/* WhatsApp live status bar */}
+              {isWaLive && (
+                <div className="mb-3 p-2 rounded-lg bg-[#25D366]/5 border border-[#25D366]/20 flex items-center gap-2">
+                  <span className="text-xs text-[#25D366] font-medium">
+                    ✅ {waStatus.message ?? "Connected via WhatsApp"}
+                  </span>
                 </div>
               )}
 
@@ -138,12 +154,12 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
                 <button
                   onClick={() => setShowModal(channel)}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                    isConnected
+                    isConnected || isWaLive
                       ? "border border-[#E2E8F0] text-[#64748B] hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                       : "bg-[#00C853] text-black hover:bg-[#00E676]"
                   }`}
                 >
-                  {isConnected ? "Re-configure" : "Connect"}
+                  {isConnected || isWaLive ? "Re-scan" : "Connect"}
                 </button>
               </div>
             </div>
@@ -170,12 +186,12 @@ export default function IntegrationsClient({ workspace, session }: IntegrationsC
         ))}
       </div>
 
-      {/* WhatsApp modal */}
+      {/* WhatsApp QR modal */}
       {showModal === "WHATSAPP" && workspace && (
-        <WhatsAppConfigModal
+        <WhatsAppQRModal
           workspaceId={workspace.id}
           onClose={() => setShowModal(null)}
-          onSuccess={() => handleSuccess()}
+          onConnected={() => handleSuccess()}
         />
       )}
     </div>
