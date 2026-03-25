@@ -61,7 +61,7 @@ export async function PATCH(req: NextRequest) {
       tone: tone ?? existing.tone,
       language: language ?? existing.language,
       emojiStyle: emojiStyle ?? existing.emojiStyle,
-      instructions: instructions ?? existing.instructions,
+      instructions: instructions !== undefined ? instructions : existing.instructions,
       isDefault: isDefault ?? existing.isDefault,
     },
   });

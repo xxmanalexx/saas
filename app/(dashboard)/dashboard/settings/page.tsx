@@ -95,9 +95,12 @@ export default function SettingsPage() {
 
       if (!personaRes.ok) throw new Error("Failed to save persona");
 
-      // Update local state with the saved persona (includes server-assigned id if new)
-      const savedPersona = await personaRes.json();
-      setPersona(savedPersona);
+      // Re-fetch fresh persona data from server so UI is always in sync
+      const personasData = await fetch("/api/personas").then((r) => r.json());
+      const latestDefault = Array.isArray(personasData)
+        ? personasData.find((p: Persona) => p.isDefault) ?? personasData[0]
+        : null;
+      if (latestDefault) setPersona(latestDefault);
 
       setMsg("✅ Settings saved!");
     } catch {
