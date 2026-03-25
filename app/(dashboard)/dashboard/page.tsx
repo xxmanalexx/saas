@@ -9,6 +9,38 @@ interface Stats {
   avgResponseMs: number | null;
 }
 
+interface ConversationMessage {
+  content: string;
+  createdAt: string;
+}
+
+interface ConversationContact {
+  channel: string;
+  channelIdentifier: string;
+  profile: Record<string, string>;
+}
+
+interface DashboardConversation {
+  id: string;
+  channel: string;
+  status: string;
+  updatedAt: string;
+  contact: ConversationContact | null;
+  messages: ConversationMessage[];
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 function formatMs(ms: number | null): string {
   if (ms == null) return "—";
   if (ms < 1000) return `${ms}ms`;
@@ -18,17 +50,27 @@ function formatMs(ms: number | null): string {
 export default function DashboardRoot() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [conversations, setConversations] = useState<DashboardConversation[]>([]);
+  const [convLoading, setConvLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/dashboard/stats")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.error) {
-          setStats(data);
-        }
+        if (!data.error) setStats(data);
       })
       .catch(() => {})
       .finally(() => setStatsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/conversations")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setConversations(data.slice(0, 5));
+      })
+      .catch(() => {})
+      .finally(() => setConvLoading(false));
   }, []);
 
   return (
@@ -71,26 +113,31 @@ export default function DashboardRoot() {
         <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
           <h2 className="font-semibold text-[#0A0F1C] mb-4">Recent Conversations</h2>
           <div className="space-y-3">
-            {[
-              { channel: "WhatsApp", preview: "Hi, I want to know about pricing", time: "2m ago", status: "resolved" },
-              { channel: "Instagram", preview: "Can you help me set up the integration?", time: "14m ago", status: "active" },
-              { channel: "Web Chat", preview: "Is there a free trial?", time: "1h ago", status: "qualified" },
-              { channel: "Email", preview: "Following up on our demo last week", time: "3h ago", status: "escalated" },
-            ].map((conv) => (
-              <div key={conv.channel} className="flex items-start gap-3 pb-3 border-b border-[#F1F5F9] last:border-0">
+            {convLoading ? (
+              <div className="text-sm text-[#94A3B8] py-4 text-center">Loading...</div>
+            ) : conversations.length === 0 ? (
+              <div className="text-sm text-[#94A3B8] py-4 text-center">No conversations yet</div>
+            ) : conversations.map((conv) => (
+              <div key={conv.id} className="flex items-start gap-3 pb-3 border-b border-[#F1F5F9] last:border-0">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-[#0A0F1C]">{conv.channel}</span>
+                    <span className="text-xs font-medium text-[#0A0F1C]">{conv.channel ?? conv.contact?.channel ?? "—"}</span>
                     <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                      conv.status === "resolved" ? "bg-[#00C853]/10 text-[#00C853]" :
-                      conv.status === "active" ? "bg-blue-100 text-blue-600" :
-                      conv.status === "qualified" ? "bg-purple-100 text-purple-600" :
-                      "bg-amber-100 text-amber-600"
-                    }`}>{conv.status}</span>
+                      conv.status === "ACTIVE" ? "bg-blue-100 text-blue-600" :
+                      conv.status === "ESCALATED" ? "bg-amber-100 text-amber-600" :
+                      conv.status === "RESOLVED" ? "bg-[#00C853]/10 text-[#00C853]" :
+                      "bg-[#F1F5F9] text-[#64748B]"
+                    }`}>{conv.status ?? "—"}</span>
                   </div>
-                  <p className="text-sm text-[#64748B] truncate mt-0.5">{conv.preview}</p>
+                  <p className="text-sm text-[#64748B] truncate mt-0.5">
+                    {conv.messages?.[0]?.content
+                      ? conv.messages[0].content.slice(0, 60)
+                      : conv.contact?.profile?.name ?? conv.contact?.channelIdentifier ?? "—"}
+                  </p>
                 </div>
-                <span className="text-xs text-[#94A3B8] flex-shrink-0">{conv.time}</span>
+                <span className="text-xs text-[#94A3B8] flex-shrink-0">
+                  {conv.updatedAt ? timeAgo(conv.updatedAt) : "—"}
+                </span>
               </div>
             ))}
           </div>
