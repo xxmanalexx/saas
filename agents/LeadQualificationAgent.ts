@@ -111,8 +111,24 @@ Respond ONLY as JSON with fields: score (0-100), stage (HOT|WARM|COLD), summary 
   };
   try {
     const raw = JSON.parse(result.content);
-    parsed = { score: parsed.score, stage: raw.stage ?? "WARM", suggestedAction: raw.suggestedAction ?? "nurture", summary: raw.summary ?? "", response: raw.response ?? result.content };
+    parsed = {
+      score: Number(raw.score) || 50,
+      stage: String(raw.stage ?? "WARM"),
+      suggestedAction: String(raw.suggestedAction ?? "nurture"),
+      summary: String(raw.summary ?? ""),
+      // response must be a non-JSON string — if it looks like it could be JSON, extract it
+      response: typeof raw.response === "string" && raw.response.startsWith("{")
+        ? result.content  // AI returned raw JSON instead of a readable response
+        : String(raw.response ?? result.content),
+    };
   } catch { /* use defaults */ }
+
+  // Guard: if response is still JSON-ish (parse failed), return a readable fallback
+  let finalResponse = parsed.response;
+  if (!finalResponse || finalResponse.startsWith("{") || finalResponse.startsWith("[")) {
+    console.warn("[LeadQualificationAgent] response looked like JSON, using content directly");
+    finalResponse = result.content;
+  }
 
   const stageMap: Record<string, "QUALIFIED" | "CONTACTED" | "NEW"> = {
     HOT: "QUALIFIED", WARM: "CONTACTED", COLD: "NEW",
@@ -131,6 +147,6 @@ Respond ONLY as JSON with fields: score (0-100), stage (HOT|WARM|COLD), summary 
     responses: JSON.parse(existingLead?.notes as string ?? "{}"),
     summary: parsed.summary,
     suggestedAction: responseAction,
-    response: parsed.response,
+    response: finalResponse,
   };
 }
