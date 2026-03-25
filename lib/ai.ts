@@ -39,6 +39,9 @@ export async function aiComplete(
         messages,
         temperature: options?.temperature ?? 0.7,
         stream: false,
+        // Keep model loaded for 5 minutes after this request completes
+        // so the next message doesn't wait for a cold load
+        keep_alive: 5 * 60,
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -84,7 +87,7 @@ export async function* aiStream(
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify({ model, messages, stream: true, keep_alive: 5 * 60 }),
     signal: AbortSignal.timeout(timeoutMs),
   });
 
