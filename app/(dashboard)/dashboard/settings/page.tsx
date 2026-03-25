@@ -19,6 +19,7 @@ interface Settings {
   name: string;
   ollamaUrl: string;
   ollamaModel: string;
+  ollamaThinking: boolean;
   databaseUrl: string;
   defaultPersona: Persona | null;
 }
@@ -83,6 +84,7 @@ export default function SettingsPage() {
           name: settings.name,
           ollamaUrl: settings.ollamaUrl,
           ollamaModel: settings.ollamaModel,
+          ollamaThinking: settings.ollamaThinking,
         }),
       });
 
@@ -201,6 +203,25 @@ export default function SettingsPage() {
               <p className="text-xs text-[#94A3B8] mt-1.5">
                 Run <code className="bg-[#F1F5F9] px-1 rounded">ollama pull llama3.2</code> to download. Other options: mistral, codellama, phi3.
               </p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-[#334155]">Extended thinking</div>
+                <p className="text-xs text-[#94A3B8]">Allow the model to reason step-by-step before responding (slower but smarter)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings((s) => s ? { ...s, ollamaThinking: !s.ollamaThinking } : s)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  settings?.ollamaThinking ? "bg-[#00C853]" : "bg-[#CBD5E1]"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    settings?.ollamaThinking ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
             </div>
           </div>
         </section>

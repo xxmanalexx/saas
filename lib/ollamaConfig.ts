@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 interface OllamaConfig {
   ollamaUrl: string;
   ollamaModel: string;
+  ollamaThinking: boolean;
   databaseUrl?: string;
 }
 
@@ -22,12 +23,13 @@ export async function getOllamaConfig(workspaceId: string): Promise<OllamaConfig
 
   const workspace = await db.workspace.findUnique({
     where: { id: workspaceId },
-    select: { ollamaUrl: true, ollamaModel: true, databaseUrl: true },
+    select: { ollamaUrl: true, ollamaModel: true, ollamaThinking: true, databaseUrl: true },
   });
 
   const config: OllamaConfig = {
     ollamaUrl: workspace?.ollamaUrl ?? "http://localhost:11434",
     ollamaModel: workspace?.ollamaModel ?? "llama3.2",
+    ollamaThinking: workspace?.ollamaThinking ?? true,
     databaseUrl: workspace?.databaseUrl ?? undefined,
   };
 

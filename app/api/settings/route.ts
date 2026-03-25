@@ -20,6 +20,7 @@ export async function GET() {
       settings: true,
       ollamaUrl: true,
       ollamaModel: true,
+      ollamaThinking: true,
       databaseUrl: true,
       personas: {
         where: { isDefault: true },
@@ -36,6 +37,7 @@ export async function GET() {
     settings: workspace.settings,
     ollamaUrl: workspace.ollamaUrl,
     ollamaModel: workspace.ollamaModel,
+    ollamaThinking: workspace.ollamaThinking,
     databaseUrl: workspace.databaseUrl ?? "",
     defaultPersona: workspace.personas[0] ?? null,
   });
@@ -46,7 +48,7 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, settings, ollamaUrl, ollamaModel, databaseUrl } = body;
+  const { name, settings, ollamaUrl, ollamaModel, ollamaThinking, databaseUrl } = body;
 
   const workspace = await db.workspace.findFirst({
     where: { userId: session.user.id },
@@ -61,6 +63,7 @@ export async function PATCH(req: NextRequest) {
       ...(settings !== undefined && { settings }),
       ...(ollamaUrl !== undefined && { ollamaUrl }),
       ...(ollamaModel !== undefined && { ollamaModel }),
+      ...(ollamaThinking !== undefined && { ollamaThinking }),
       ...(databaseUrl !== undefined && { databaseUrl }),
     },
     select: {
@@ -69,6 +72,7 @@ export async function PATCH(req: NextRequest) {
       settings: true,
       ollamaUrl: true,
       ollamaModel: true,
+      ollamaThinking: true,
       databaseUrl: true,
     },
   });

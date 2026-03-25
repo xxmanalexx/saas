@@ -219,7 +219,7 @@ export async function processMessage(
   }
 
   // ── 5. Route to appropriate agent ─────────────────────────────────────────
-  const aiOpts = { ollamaUrl: ollamaCfg.ollamaUrl, model: ollamaCfg.ollamaModel };
+  const aiOpts = { ollamaUrl: ollamaCfg.ollamaUrl, model: ollamaCfg.ollamaModel, thinking: ollamaCfg.ollamaThinking };
 
   const routing = await routerAgent(
     workspaceId,

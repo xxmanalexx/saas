@@ -17,6 +17,7 @@ export interface AiOptions {
   model?: string;
   temperature?: number;
   timeoutMs?: number;
+  thinking?: boolean; // default true; set false to disable extended thinking
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000; // 90s — gemma3/large models need more time
@@ -42,6 +43,8 @@ export async function aiComplete(
         // Keep model loaded for 5 minutes after this request completes
         // so the next message doesn't wait for a cold load
         keep_alive: 5 * 60,
+        // Disable extended thinking if user turned it off in settings
+        ...(options?.thinking === false && { think: false }),
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -87,7 +90,7 @@ export async function* aiStream(
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true, keep_alive: 5 * 60 }),
+    body: JSON.stringify({ model, messages, stream: true, keep_alive: 5 * 60, ...(options?.thinking === false && { think: false }) }),
     signal: AbortSignal.timeout(timeoutMs),
   });
 
