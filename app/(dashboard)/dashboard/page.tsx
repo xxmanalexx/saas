@@ -1,9 +1,35 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
+"use client";
 
-export default async function DashboardRoot() {
-  const session = await auth();
-  if (!session) redirect("/login");
+import { useState, useEffect } from "react";
+
+interface Stats {
+  totalConversations: number;
+  totalLeads: number;
+  qualifiedLeads: number;
+  avgResponseMs: number | null;
+}
+
+function formatMs(ms: number | null): string {
+  if (ms == null) return "—";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+export default function DashboardRoot() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dashboard/stats")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) {
+          setStats(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -17,10 +43,10 @@ export default async function DashboardRoot() {
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-6">
         {[
-          { label: "Conversations", value: "247", delta: "+12%", icon: "💬" },
-          { label: "Leads Qualified", value: "38", delta: "+5", icon: "🎯" },
-          { label: "Avg Response Time", value: "1.2s", delta: "-0.3s", icon: "⚡" },
-          { label: "Revenue Impact", value: "$4.2K", delta: "+18%", icon: "📈" },
+          { label: "Conversations", value: statsLoading ? "—" : String(stats?.totalConversations ?? "—"), delta: null, icon: "💬" },
+          { label: "Leads Qualified", value: statsLoading ? "—" : String(stats?.qualifiedLeads ?? "—"), delta: null, icon: "🎯" },
+          { label: "Avg Response Time", value: formatMs(stats?.avgResponseMs ?? null), delta: null, icon: "⚡" },
+          { label: "Total Leads", value: statsLoading ? "—" : String(stats?.totalLeads ?? "—"), delta: null, icon: "📈" },
         ].map(({ label, value, delta, icon }) => (
           <div
             key={label}
@@ -28,9 +54,11 @@ export default async function DashboardRoot() {
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-2xl">{icon}</span>
-              <span className="text-xs font-medium text-[#00C853] bg-[#00C853]/10 px-2 py-1 rounded-full">
-                {delta}
-              </span>
+              {delta && (
+                <span className="text-xs font-medium text-[#00C853] bg-[#00C853]/10 px-2 py-1 rounded-full">
+                  {delta}
+                </span>
+              )}
             </div>
             <div className="text-3xl font-bold text-[#0A0F1C]">{value}</div>
             <div className="text-sm text-[#64748B] mt-1">{label}</div>

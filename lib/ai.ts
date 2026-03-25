@@ -72,3 +72,43 @@ export async function aiCompleteSimple(
   messages.push({ role: "user", content: prompt });
   return aiComplete(messages, options);
 }
+
+export async function* aiStream(
+  messages: AiMessage[],
+  options?: AiOptions
+): AsyncGenerator<string, void, unknown> {
+  const url = (options?.ollamaUrl ?? OLLAMA_BASE) + "/api/chat";
+  const model = options?.model ?? DEFAULT_MODEL;
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: true }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
+  if (!res.body) throw new Error("No response body");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      for (const line of chunk.split("\n")) {
+        if (!line.trim() || !line.startsWith("{")) continue;
+        try {
+          const parsed = JSON.parse(line);
+          const content = parsed.message?.content;
+          if (content) yield content;
+        } catch { /* skip invalid JSON lines */ }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
