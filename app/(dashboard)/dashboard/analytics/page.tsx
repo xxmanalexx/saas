@@ -128,9 +128,10 @@ export default function AnalyticsPage() {
 
   // Pipeline funnel stages (ordered)
   const funnelStages = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON"] as const;
-  // Include LOST in the max so the relative widths are correct (2 lost vs 1 won = LOST bar is 2x wider)
+  // Include ALL stages including LOST so bar widths reflect true relative counts
+  // e.g. WON=1, LOST=2 → funnelMax=2 → LOST bar is 2x wider than WON bar
   const funnelMax = Math.max(
-    ...funnelStages.map((s) => stages[s] ?? 0),
+    funnelStages.reduce((max, s) => Math.max(max, stages[s] ?? 0), 0),
     stages.LOST ?? 0,
     1,
   );
