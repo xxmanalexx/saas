@@ -40,14 +40,17 @@ export function buildPersonaContext(persona: AgentPersona | null): string {
     lines.push(toneInstructions[persona.tone]);
   }
 
-  // Language — shapes what language the agent responds in
+  // Language — detect from custom instructions if possible, otherwise use DB field.
+  // Priority: if custom instructions contain Arabic script → force Arabic.
+  const hasArabic = /[\u0600-\u06FF]/.test(persona.instructions ?? "");
   const langInstructions: Record<string, string> = {
     en: "Respond in English.",
     ar: "Respond in Arabic (use Arabic script throughout).",
     hi: "Respond in Hindi.",
     fr: "Respond in French.",
   };
-  lines.push(langInstructions[persona.language] ?? langInstructions.en);
+  const lang = hasArabic ? "ar" : persona.language;
+  lines.push(langInstructions[lang] ?? langInstructions.en);
 
   // Emoji style — concrete rule the model actually follows
   const emojiRules: Record<string, string> = {
