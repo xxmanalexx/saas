@@ -1,12 +1,12 @@
 generator client {
   provider   = "prisma-client-js"
-  // "client" = pure JS (no engine binary needed, works for both PostgreSQL and SQLite)
-  // "library" = native addon (better-sqlite3 must be compiled, uncomment if using SQLite directly)
   engineType = "client"
+  output   = "../node_modules/.prisma/client/sqlite"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
+  url = env("DATABASE_URL")
 }
 
 model Account {
@@ -15,12 +15,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String? 
+  access_token      String? 
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String? 
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -168,7 +168,7 @@ model Message {
   id             String   @id @default(cuid())
   conversationId String
   role           Role
-  content        String   @db.Text
+  content        String   
   metadata       Json     @default("{}")
   tokensUsed     Int?
   latencyMs      Int?
@@ -187,7 +187,7 @@ model AgentMessage {
   id        String   @id @default(cuid())
   agentId   String
   role      Role
-  content   String   @db.Text
+  content   String   
   metadata  Json     @default("{}")
   createdAt DateTime @default(now())
 
@@ -219,7 +219,7 @@ model Lead {
   score       Int        @default(0) // 0-100
   stage       LeadStage  @default(NEW)
   ownerId     String?    // sales rep user ID
-  notes       String?    @db.Text
+  notes       String?    
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -337,7 +337,7 @@ model KnowledgeBase {
   id          String   @id @default(cuid())
   workspaceId String
   title       String
-  content     String   @db.Text
+  content     String   
   category    String   @default("general") // general, faq, pricing, policy, product
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -357,7 +357,7 @@ model AgentPersona {
   language    String      @default("en") // en, ar, hi, fr, etc.
   dialect     String      @default("")   // khaliji, iraqi, shami, egyptian, maghrebi, saudi, or empty
   emojiStyle  EmojiStyle  @default(SOMETIMES)
-  instructions String    @db.Text @default("")
+  instructions String     @default("")
   isDefault   Boolean     @default(false)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
