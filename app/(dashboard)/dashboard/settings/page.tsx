@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { clearOllamaCache } from "@/lib/ollamaConfig";
 
 interface Persona {
   id?: string;
@@ -88,9 +87,6 @@ export default function SettingsPage() {
       });
 
       if (!res.ok) throw new Error("Failed to save");
-
-      // Clear the Ollama config cache so new values take effect immediately
-      if (settings.id) clearOllamaCache(settings.id);
 
       // Save/update persona — PATCH if it exists, POST to create if new
       const personaMethod = persona.id ? "PATCH" : "POST";

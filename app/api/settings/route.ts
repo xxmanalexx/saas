@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { clearOllamaCache } from "@/lib/ollamaConfig";
 
 export async function GET() {
   const session = await auth();
@@ -71,6 +72,9 @@ export async function PATCH(req: NextRequest) {
       databaseUrl: true,
     },
   });
+
+  // Clear cached Ollama config so changes take effect immediately
+  clearOllamaCache(workspace.id);
 
   return NextResponse.json(updated);
 }
