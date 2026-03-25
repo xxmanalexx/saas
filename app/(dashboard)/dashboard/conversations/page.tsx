@@ -53,21 +53,16 @@ export default function ConversationsPage() {
     setSelected(next);
   };
 
-  const clearSelected = async () => {
-    if (selected.size === 0) return;
-    if (!confirm(`Delete ${selected.size} conversation(s)? This cannot be undone.`)) return;
-
-    const ids = Array.from(selected);
-    await Promise.all(
-      ids.map((id) =>
-        fetch(`/api/conversations/${id}`, { method: "DELETE" })
-      )
-    );
-    setSelected(new Set());
-    // Re-fetch so new WhatsApp messages don't recreate deleted conversations in the list
-    const res = await fetch("/api/conversations");
-    const data = await res.json();
-    if (Array.isArray(data)) setConversations(data);
+  const clearMessages = async (id: string) => {
+    if (!confirm("Clear all messages in this conversation? The contact will get a fresh chat.")) return;
+    const res = await fetch(`/api/conversations/${id}`, { method: "PATCH" });
+    if (res.ok) {
+      setConversations((cs) =>
+        cs.map((c) =>
+          c.id === id ? { ...c, messages: [], status: "ACTIVE" } : c
+        )
+      );
+    }
   };
 
   const allSelected = conversations.length > 0 && selected.size === conversations.length;
@@ -84,7 +79,15 @@ export default function ConversationsPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#64748B]">{selected.size} selected</span>
             <button
-              onClick={clearSelected}
+              onClick={async () => {
+                if (!confirm(`Delete ${selected.size} conversation(s)? This cannot be undone.`)) return;
+                const ids = Array.from(selected);
+                await Promise.all(ids.map(id => fetch(`/api/conversations/${id}`, { method: "DELETE" })));
+                setSelected(new Set());
+                const res = await fetch("/api/conversations");
+                const data = await res.json();
+                if (Array.isArray(data)) setConversations(data);
+              }}
               className="px-3 py-1.5 rounded-lg text-sm bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-colors"
             >
               Delete selected
@@ -161,6 +164,19 @@ export default function ConversationsPage() {
                       conv.status === "RESOLVED" ? "bg-[#00C853]/10 text-[#00C853]" :
                       "bg-[#F1F5F9] text-[#64748B]"
                     }`}>{conv.status}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      {conv.messages.length > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); clearMessages(conv.id); }}
+                          title="Clear chat history"
+                          className="p-1.5 rounded-lg text-xs text-[#94A8B8] hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        >
+                          🗑️ Clear
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-[#94A3B8]">
                     {new Date(conv.updatedAt).toLocaleString()}
