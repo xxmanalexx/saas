@@ -173,25 +173,33 @@ export async function processMessage(
     content: m.content,
   }));
 
-  // ── 4. Check for escalation triggers ─────────────────────────────────────
-  const escalateCheck = await shouldEscalate(content, history);
-  if (escalateCheck.escalate) {
-    const escalationMsg = "Of course — let me connect you with our team. Someone will be in touch shortly.";
-    await db.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: "ASSISTANT",
-        content: escalationMsg,
-        metadata: { reason: escalateCheck.reason },
-      },
-    });
+  // ── 4. Escalation check — hand off to human if conditions are met ────────────
+  const escalation = await shouldEscalate(content, history, knowledgeContext);
+  if (escalation.escalate) {
+    console.log(`[conversationEngine] ESCALATING: ${escalation.reason} (severity: ${escalation.severity})`);
+
     await db.conversation.update({
       where: { id: conversation.id },
       data: { status: "ESCALATED" },
     });
+
+    const handoverMessage =
+      escalation.severity === "high"
+        ? "أقدّر تواصلك! سأنقلك إلى أحد أعضاء فريقنا لمساعدتك بشكل شخصي. 😊"
+        : "أقدّر تواصلك! سأنقلك إلى أحد أعضاء فريقنا الآن. 😊";
+
+    await db.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "ASSISTANT",
+        content: handoverMessage,
+      },
+    });
+
     return {
-      response: escalationMsg,
+      response: handoverMessage,
       agentUsed: "ROUTER",
+      leadId: undefined,
       escalated: true,
       latencyMs: Date.now() - start,
     };
