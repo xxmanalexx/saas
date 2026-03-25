@@ -87,12 +87,30 @@ export async function* aiStream(
   const model = options?.model ?? DEFAULT_MODEL;
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true, keep_alive: 5 * 60, ...(options?.thinking === false && { think: false }) }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        // Keep model loaded indefinitely after this request to prevent cold starts
+        keep_alive: -1,
+        // Disable extended thinking if user turned it off in settings
+        ...(options?.thinking === false && { think: false }),
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    // Timeout or network error — yield a user-friendly message and stop gracefully
+    if (err instanceof Error && err.name === "TimeoutError") {
+      yield "عذراً، استغرق الرد وقتاً طويلاً. حاول مرة أخرى.";
+      return;
+    }
+    throw err;
+  }
 
   if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
   if (!res.body) throw new Error("No response body");
