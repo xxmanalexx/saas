@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 interface OllamaConfig {
   ollamaUrl: string;
   ollamaModel: string;
+  databaseUrl?: string;
 }
 
 const cache = new Map<string, { config: OllamaConfig; expiresAt: number }>();
@@ -21,16 +22,21 @@ export async function getOllamaConfig(workspaceId: string): Promise<OllamaConfig
 
   const workspace = await db.workspace.findUnique({
     where: { id: workspaceId },
-    select: { ollamaUrl: true, ollamaModel: true },
+    select: { ollamaUrl: true, ollamaModel: true, databaseUrl: true },
   });
 
   const config: OllamaConfig = {
     ollamaUrl: workspace?.ollamaUrl ?? "http://localhost:11434",
     ollamaModel: workspace?.ollamaModel ?? "llama3.2",
+    databaseUrl: workspace?.databaseUrl ?? undefined,
   };
 
   cache.set(workspaceId, { config, expiresAt: Date.now() + TTL_MS });
   return config;
+}
+
+export function clearOllamaCache(workspaceId: string): void {
+  cache.delete(workspaceId);
 }
 
 export function getOllamaConfigSync(workspaceId: string): OllamaConfig | null {
