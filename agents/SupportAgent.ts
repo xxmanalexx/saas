@@ -66,8 +66,8 @@ export async function supportAgent(
 
   // ── AI-powered fallback ───────────────────────────────────────────────────
   const systemPrompt =
-    `You are a customer support agent.` +
     (personaContext ?? "") +
+    `You are a customer support agent.` +
     (knowledgeContext ?? "") +
     `\n\nFollow these rules:
 - Only answer questions using information from the knowledge base above

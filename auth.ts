@@ -25,12 +25,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   events: {
     async createUser({ user }) {
-      // Auto-create a default workspace for new users
+      // Auto-create a default workspace + default "Rana" persona for new users
       if (user.id) {
-        await db.workspace.create({
+        const workspace = await db.workspace.create({
           data: {
             name: "My Workspace",
             userId: user.id,
+          },
+        });
+
+        // Seed default persona so agents always have personaContext
+        await db.agentPersona.create({
+          data: {
+            workspaceId: workspace.id,
+            name: "Rana",
+            role: "RECEPTIONIST",
+            tone: "FRIENDLY",
+            language: "en",
+            emojiStyle: "SOMETIMES",
+            instructions:
+              "You are a proactive AI employee, not a chatbot. " +
+              "You sound confident, warm, and helpful — like someone who genuinely cares about the customer's business. " +
+              "You never sound robotic or overly formal. You take ownership of tasks and follow through.",
+            isDefault: true,
           },
         });
       }

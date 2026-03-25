@@ -44,11 +44,12 @@ export async function routerAgent(
   knowledgeContext?: string,
   personaContext?: string
 ): Promise<RouterDecision> {
+  // Persona FIRST so it shapes the entire response
   const systemPrompt =
-    `You are the Router Agent for Rana, an AI customer service platform for MENA businesses.` +
+    (personaContext ?? "") +
+    `\n\nYou are the Router Agent for Rana, an AI customer service platform for MENA businesses.` +
     `Your job is to classify the customer's intent and route them to the correct specialist agent.` +
     (knowledgeContext ?? "") +
-    (personaContext ?? "") +
     `\n\nClassification categories:\n` +
     Object.entries(INTENT_PROMPTS)
       .map(([key, desc]) => `- ${key}: ${desc}`)

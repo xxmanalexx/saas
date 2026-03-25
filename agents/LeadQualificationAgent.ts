@@ -59,14 +59,10 @@ export async function leadQualificationAgent(
       });
     }
 
-    const prompt = `The customer said: "${incomingMessage}"
-
-Ask them naturally: ${nextQuestion}
-Keep the conversation flowing — don't repeat questions they've already answered.`;
-
+    // Persona FIRST so it shapes the conversation style
     const systemPrompt =
-      `You are a lead qualification agent.` +
       (personaContext ?? "") +
+      `\n\nYou are a lead qualification agent.` +
       (knowledgeContext ?? "") +
       `\n\nYour job is to qualify the lead by asking up to 5 key questions.
 Ask one question at a time. Be friendly and conversational.
@@ -75,7 +71,7 @@ After 3+ answers, make a judgment and give a recommendation.`;
     const messages: AiMessage[] = [
       { role: "system", content: systemPrompt },
       ...conversationHistory.slice(-8),
-      { role: "user", content: prompt },
+      { role: "user", content: `The customer said: "${incomingMessage}"\n\nAsk them naturally: ${nextQuestion}` },
     ];
 
     const result = await aiComplete(messages, aiOpts);
@@ -92,8 +88,8 @@ After 3+ answers, make a judgment and give a recommendation.`;
 
   // ── Qualification complete — AI makes a final recommendation ───────────────
   const systemPrompt =
-    `You are a lead qualification agent for Rana.` +
     (personaContext ?? "") +
+    `You are a lead qualification agent for Rana.` +
     (knowledgeContext ?? "") +
     `\n\nBased on the customer's previous answers, determine:
 1. Their fit score: HOT (ready to buy, clear budget, timeline), WARM (interested, timeline vague), COLD (early stage, exploring)

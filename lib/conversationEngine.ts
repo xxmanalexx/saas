@@ -6,8 +6,66 @@ import { bookingAgent } from "@/agents/BookingAgent";
 import { followUpAgent } from "@/agents/FollowUpAgent";
 import { getOllamaConfig } from "@/lib/ollamaConfig";
 import type { AiMessage } from "@/lib/ai";
-import type { Channel, Conversation, Contact } from "@prisma/client";
-import type { AgentType } from "@prisma/client";
+import type { AgentType, AgentPersona, Channel, Conversation, Contact } from "@prisma/client";
+
+// ─── Persona context builder ─────────────────────────────────────────────────
+// Turns DB fields into concrete behavioral instructions the model follows.
+export function buildPersonaContext(persona: AgentPersona | null): string {
+  if (!persona) return "";
+
+  const lines: string[] = [];
+
+  // Name & role — shapes how the agent introduces itself
+  lines.push(`You are ${persona.name}.`);
+
+  const roleDescriptions: Record<string, string> = {
+    RECEPTIONIST: "Your role is reception — greet warmly, qualify quickly, route wisely.",
+    MARKETER:     "Your role is marketing — be persuasive, highlight value, create urgency.",
+    SALES:        "Your role is sales — understand the customer's needs deeply, recommend confidently.",
+    SUPPORT:      "Your role is support — be patient, thorough, and reassuring.",
+    GENERAL:      "Your role is general assistance.",
+  };
+  if (persona.role && roleDescriptions[persona.role]) {
+    lines.push(roleDescriptions[persona.role]);
+  }
+
+  // Tone — shapes word choice and sentence structure
+  const toneInstructions: Record<string, string> = {
+    FRIENDLY:     "Use a warm, conversational tone. Treat the customer like a valued friend.",
+    PROFESSIONAL: "Use a polished, business-appropriate tone. Be clear and concise.",
+    CASUAL:       "Use a relaxed, informal tone. Feel free to be playful and direct.",
+    FORMAL:       "Use a respectful, formal tone. Be precise and courteous.",
+  };
+  if (persona.tone && toneInstructions[persona.tone]) {
+    lines.push(toneInstructions[persona.tone]);
+  }
+
+  // Language — shapes what language the agent responds in
+  const langInstructions: Record<string, string> = {
+    en: "Respond in English.",
+    ar: "Respond in Arabic (use Arabic script throughout).",
+    hi: "Respond in Hindi.",
+    fr: "Respond in French.",
+  };
+  lines.push(langInstructions[persona.language] ?? langInstructions.en);
+
+  // Emoji style — concrete rule the model actually follows
+  const emojiRules: Record<string, string> = {
+    NEVER:    "Do NOT use emojis.",
+    SOMETIMES: "Use emojis sparingly — only for warmth on greetings or celebrations. Keep it minimal.",
+    OFTEN:    "Use 1-2 relevant emojis per message to add personality.",
+  };
+  if (persona.emojiStyle && emojiRules[persona.emojiStyle]) {
+    lines.push(emojiRules[persona.emojiStyle]);
+  }
+
+  // Custom instructions — highest priority override
+  if (persona.instructions?.trim()) {
+    lines.push(`\nCustom instructions from the business owner: ${persona.instructions.trim()}`);
+  }
+
+  return `\n\n--- AGENT PERSONA ---\n${lines.join("\n")}\n--- END PERSONA ---`;
+}
 
 export interface ProcessMessageInput {
   workspaceId: string;
@@ -52,17 +110,8 @@ export async function processMessage(
       "\n--- END KNOWLEDGE BASE ---"
     : "";
 
-  // Build persona context string
-  const personaContext = persona
-    ? `\n\n--- AGENT PERSONA ---\n` +
-      `Name: ${persona.name}\n` +
-      `Role: ${persona.role}\n` +
-      `Tone: ${persona.tone}\n` +
-      `Language: ${persona.language}\n` +
-      `Emoji style: ${persona.emojiStyle}\n` +
-      (persona.instructions ? `Custom instructions: ${persona.instructions}\n` : "") +
-      `--- END PERSONA ---`
-    : "";
+  // Build persona context string using the structured builder
+  const personaContext = buildPersonaContext(persona);
 
   // ── 1. Get or create contact ──────────────────────────────────────────────
   const contact = await db.contact.upsert({
