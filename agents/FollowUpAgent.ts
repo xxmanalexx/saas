@@ -90,10 +90,18 @@ Write ONLY the message in Arabic or English as appropriate. No quotes, no explan
           temperature: 0.7,
           timeoutMs: 30_000,
         });
-        if (aiResult.content && aiResult.content.trim().length > 0) {
+        // Only use the AI response if it looks valid — not the Arabic timeout error
+        const isOllamaError =
+          !aiResult.content ||
+          aiResult.content.includes("استغرق الرد وقتاً") ||
+          aiResult.content.includes("timeout") ||
+          aiResult.content.length < 3;
+        if (!isOllamaError) {
           finalMessage = aiResult.content.trim();
         }
+        // else: Ollama failed → keep baseMessage as fallback
       } catch (err) {
+        // Ollama unavailable or auth error — fall back to template silently
         console.warn(`[FollowUpAgent] AI tailoring failed, using template: ${err}`);
       }
     }

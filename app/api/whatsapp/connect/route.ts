@@ -57,8 +57,9 @@ export async function POST(req: NextRequest) {
           // WhatsApp group JIDs always contain @g.us
           const isGroup = remoteJid.includes("@g.us");
           const isNewsletter = remoteJid.includes("@newsletter");
-          if (isGroup || isNewsletter) {
-            console.log(`[WhatsApp] BLOCKED ${isNewsletter ? "newsletter" : "group"} message from ${remoteJid} — not responding`);
+          const isStatus = remoteJid.endsWith("@status.broadcast");
+          if (isGroup || isNewsletter || isStatus) {
+            console.log(`[WhatsApp] BLOCKED ${isStatus ? "status broadcast" : isNewsletter ? "newsletter" : "group"} message from ${remoteJid} — not responding`);
             return;
           }
 
