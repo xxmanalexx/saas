@@ -92,59 +92,48 @@ After 3+ answers, make a judgment and give a recommendation.`;
     `You are a lead qualification agent for Rana.` +
     (knowledgeContext ?? "") +
     `\n\nBased on the customer's previous answers, determine:
-1. Their fit score: HOT (ready to buy, clear budget, timeline), WARM (interested, timeline vague), COLD (early stage, exploring)
-2. Recommended next action: book (for HOT), call (for WARM), nurture (for COLD)
-3. A brief summary of their needs
+1. Their fit: HOT (ready to buy), WARM (interested), COLD (early stage)
+2. A brief summary of their needs in 1 sentence
+3. What to tell the customer next — keep it to 1 short sentence in ARABIC, warm and natural, like a helpful sales person
 
-Respond ONLY as JSON with fields: score (0-100), stage (HOT|WARM|COLD), summary (1 sentence), suggestedAction (book|call|nurture), response (what to tell the customer — be friendly and natural).`;
+IMPORTANT: Respond with ONLY a short Arabic sentence the customer can read. Do NOT return JSON. Do NOT wrap your answer in code blocks or triple backticks.`;
 
   const messages: AiMessage[] = [
     { role: "system", content: systemPrompt },
     ...conversationHistory.slice(-12),
-    { role: "user", content: "Based on the above conversation, provide the qualification result as JSON." },
+    { role: "user", content: "Based on the customer's answers above, give me a short Arabic sentence to send to the customer." },
   ];
 
   const result = await aiComplete(messages, aiOpts);
 
-  let parsed: { score: number; stage: string; suggestedAction: string; summary: string; response: string } = {
-    score: 50, stage: "WARM", suggestedAction: "nurture", summary: "", response: result.content,
-  };
-  try {
-    const raw = JSON.parse(result.content);
-    parsed = {
-      score: Number(raw.score) || Number(raw.qualifications?.fit_score) || 50,
-      stage: String(raw.stage ?? raw.qualifications?.stage ?? "WARM"),
-      suggestedAction: String(raw.suggestedAction ?? "nurture"),
-      summary: String(raw.summary ?? ""),
-      response: typeof raw.response === "string" ? raw.response : result.content,
-    };
-  } catch { /* use defaults */ }
-
-  // Guard: if response still looks like JSON (parse succeeded but response field
-  // contained nested JSON, not a readable string), fall back to raw content
-  let finalResponse = parsed.response;
-  if (!finalResponse || finalResponse.startsWith("{")) {
-    console.warn("[LeadQualificationAgent] response was not a readable string, using raw content");
-    finalResponse = result.content.trim();
+  // We asked for a plain Arabic sentence — use it directly if it looks human-readable
+  let finalResponse = result.content.trim();
+  if (!finalResponse || finalResponse.startsWith("{") || finalResponse.startsWith("[")) {
+    console.warn("[LeadQualificationAgent] unexpected non-human response, using raw:", finalResponse.slice(0, 80));
+    finalResponse = "شكراً على تواصلك! أنا هنا لمساعدتك. تحب تحجز تجربة مجانية؟ 🚀";
   }
-
-  const stageMap: Record<string, "QUALIFIED" | "CONTACTED" | "NEW"> = {
-    HOT: "QUALIFIED", WARM: "CONTACTED", COLD: "NEW",
-  };
-  const dbStage = stageMap[parsed.stage] ?? "CONTACTED";
-  const responseAction = parsed.suggestedAction as "book" | "call" | "nurture";
+  // Best-effort score/stage extraction from conversation content (for DB records only)
+  let score = 50;
+  let dbStage: "QUALIFIED" | "CONTACTED" | "NEW" = "CONTACTED";
+  try {
+    const scoreMatch = finalResponse.match(/(\d{1,3})%|fit.*?(\d+)/i);
+    if (scoreMatch) score = Math.min(100, parseInt(scoreMatch[1] || scoreMatch[2]) || 50);
+    if (/جاهز|احتياج|يبك|sready|hot/i.test(finalResponse)) { dbStage = "QUALIFIED"; score = 80; }
+    else if (/مهتم| interested |warm/i.test(finalResponse)) { dbStage = "CONTACTED"; score = 50; }
+    else if (/لا|مش|not|غير|cold/i.test(finalResponse)) { dbStage = "NEW"; score = 20; }
+  } catch { /* keep defaults */ }
 
   if (existingLead) {
-    await db.lead.update({ where: { id: existingLead.id }, data: { score: parsed.score, stage: dbStage } });
-    await db.leadEvent.create({ data: { leadId: existingLead.id, type: "qualification_complete", data: { score: parsed.score, stage: parsed.stage } } });
+    await db.lead.update({ where: { id: existingLead.id }, data: { score, stage: dbStage } });
+    await db.leadEvent.create({ data: { leadId: existingLead.id, type: "qualification_complete", data: { score, stage: dbStage } } });
   }
 
   return {
-    score: parsed.score,
+    score,
     stage: dbStage,
     responses: JSON.parse(existingLead?.notes as string ?? "{}"),
-    summary: parsed.summary,
-    suggestedAction: responseAction,
+    summary: "",
+    suggestedAction: "nurture" as const,
     response: finalResponse,
   };
 }
