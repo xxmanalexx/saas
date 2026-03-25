@@ -5,6 +5,7 @@ import { aiStream } from "@/lib/ai";
 import { buildPersonaContext } from "@/lib/conversationEngine";
 import { getOllamaConfig } from "@/lib/ollamaConfig";
 import { transcribeAudio } from "@/lib/whisperTranscriber";
+import { triggerFollowUps } from "@/lib/triggerFollowUps";
 import type { AiMessage } from "@/lib/ai";
 import type { Channel } from "@prisma/client";
 
@@ -175,6 +176,9 @@ export async function POST(req: NextRequest) {
               content: fullResponse,
             },
           });
+
+          // Trigger follow-up check (fire and forget — no await)
+          triggerFollowUps(workspaceId);
 
           // Log the exchange
           await db.agentLog.create({

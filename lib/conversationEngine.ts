@@ -4,6 +4,7 @@ import { leadQualificationAgent } from "@/agents/LeadQualificationAgent";
 import { supportAgent } from "@/agents/SupportAgent";
 import { bookingAgent } from "@/agents/BookingAgent";
 import { getOllamaConfig } from "@/lib/ollamaConfig";
+import { triggerFollowUps } from "@/lib/triggerFollowUps";
 import type { AiMessage } from "@/lib/ai";
 import type { AgentType, AgentPersona, Channel, Conversation, Contact } from "@prisma/client";
 
@@ -327,6 +328,9 @@ export async function processMessage(
   });
 
   const latencyMs = Date.now() - start;
+
+  // Trigger follow-up check (fire and forget — no await)
+  triggerFollowUps(workspaceId);
 
   return {
     response: agentResponse,
