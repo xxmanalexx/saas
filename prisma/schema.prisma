@@ -73,8 +73,10 @@ model Workspace {
   userId    String
   settings  Json     @default("{}")
   // Ollama AI config
-  ollamaUrl  String   @default("http://localhost:11434")
-  ollamaModel String  @default("llama3.2")
+  ollamaUrl    String   @default("http://localhost:11434")
+  ollamaModel  String   @default("llama3.2")
+  // Optional custom database connection string (overrides env DATABASE_URL)
+  databaseUrl  String?  @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

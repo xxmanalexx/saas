@@ -19,6 +19,7 @@ interface Settings {
   name: string;
   ollamaUrl: string;
   ollamaModel: string;
+  databaseUrl: string;
   defaultPersona: Persona | null;
 }
 
@@ -144,6 +145,28 @@ export default function SettingsPage() {
               onChange={(e) => setSettings((s) => s ? { ...s, name: e.target.value } : s)}
               className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853]"
             />
+          </div>
+        </section>
+
+        {/* ── Database ── */}
+        <section className="bg-white rounded-2xl border border-[#E2E8F0] p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">🗄️</span>
+            <h2 className="font-semibold text-[#0A0F1C]">Database</h2>
+          </div>
+          <p className="text-xs text-[#64748B] mb-4">Custom PostgreSQL connection string (Neon, Supabase, etc.). Leave empty to use the server's default DATABASE_URL.</p>
+          <div>
+            <label className="block text-sm font-medium text-[#334155] mb-1.5">Connection string</label>
+            <input
+              type="password"
+              value={settings?.databaseUrl ?? ""}
+              onChange={(e) => setSettings((s) => s ? { ...s, databaseUrl: e.target.value } : s)}
+              placeholder="postgresql://user:pass@host:5432/dbname?sslmode=require"
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853]"
+            />
+            <p className="text-xs text-[#94A3B8] mt-1.5">
+              Neon example: <code className="bg-[#F1F5F9] px-1 rounded">postgresql://user:password@ep-xxx.eu-west-2.aws.neon.tech/neondb?sslmode=require</code>
+            </p>
           </div>
         </section>
 
