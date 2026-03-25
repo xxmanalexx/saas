@@ -16,7 +16,10 @@ export interface AiOptions {
   ollamaUrl?: string;
   model?: string;
   temperature?: number;
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 90_000; // 90s — gemma3/large models need more time
 
 export async function aiComplete(
   messages: AiMessage[],
@@ -25,6 +28,7 @@ export async function aiComplete(
   const start = Date.now();
   const url = options?.ollamaUrl ?? OLLAMA_BASE;
   const model = options?.model ?? DEFAULT_MODEL;
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   try {
     const res = await fetch(`${url}/api/chat`, {
@@ -36,7 +40,7 @@ export async function aiComplete(
         temperature: options?.temperature ?? 0.7,
         stream: false,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!res.ok) {
@@ -52,7 +56,7 @@ export async function aiComplete(
   } catch (err) {
     // Return a user-friendly error rather than crashing the conversation
     return {
-      content: "Sorry, I'm having trouble reaching the AI right now. Please try again in a moment.",
+      content: "عذراً، استغرق الرد وقتاً طويلاً. حاول مرة أخرى.",
       latencyMs: Date.now() - start,
     };
   }
