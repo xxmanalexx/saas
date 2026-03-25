@@ -128,7 +128,12 @@ export default function AnalyticsPage() {
 
   // Pipeline funnel stages (ordered)
   const funnelStages = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON"] as const;
-  const funnelMax = Math.max(...funnelStages.map((s) => stages[s] ?? 0), 1);
+  // Include LOST in the max so the relative widths are correct (2 lost vs 1 won = LOST bar is 2x wider)
+  const funnelMax = Math.max(
+    ...funnelStages.map((s) => stages[s] ?? 0),
+    stages.LOST ?? 0,
+    1,
+  );
 
   // Daily trend for chart
   const trendDays = period === "7d" ? dailyTrend.slice(-7) : dailyTrend;
