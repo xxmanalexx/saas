@@ -85,12 +85,19 @@ export default function SettingsPage() {
 
       if (!res.ok) throw new Error("Failed to save");
 
-      // Save/update persona
-      await fetch("/api/personas", {
-        method: "POST",
+      // Save/update persona — PATCH if it exists, POST to create if new
+      const personaMethod = persona.id ? "PATCH" : "POST";
+      const personaRes = await fetch("/api/personas", {
+        method: personaMethod,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(persona),
       });
+
+      if (!personaRes.ok) throw new Error("Failed to save persona");
+
+      // Update local state with the saved persona (includes server-assigned id if new)
+      const savedPersona = await personaRes.json();
+      setPersona(savedPersona);
 
       setMsg("✅ Settings saved!");
     } catch {

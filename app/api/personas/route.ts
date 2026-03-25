@@ -24,22 +24,28 @@ export async function GET() {
   return NextResponse.json(personas);
 }
 
-export async function POST(req: NextRequest) {
+export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, role, tone, language, emojiStyle, instructions, isDefault } = body;
+  const { id, name, role, tone, language, emojiStyle, instructions, isDefault } = body;
 
-  if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
+  // Verify this persona belongs to the user's workspace
   const workspace = await db.workspace.findFirst({
     where: { userId: session.user.id },
     select: { id: true },
   });
   if (!workspace) return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
 
-  // If setting as default, unset others
+  const existing = await db.agentPersona.findFirst({
+    where: { id, workspaceId: workspace.id },
+  });
+  if (!existing) return NextResponse.json({ error: "Persona not found" }, { status: 404 });
+
+  // If setting as default, unset others first
   if (isDefault) {
     await db.agentPersona.updateMany({
       where: { workspaceId: workspace.id, isDefault: true },
@@ -47,18 +53,18 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const persona = await db.agentPersona.create({
+  const updated = await db.agentPersona.update({
+    where: { id },
     data: {
-      workspaceId: workspace.id,
       name,
-      role: role ?? "SUPPORT",
-      tone: tone ?? "FRIENDLY",
-      language: language ?? "en",
-      emojiStyle: emojiStyle ?? "SOMETIMES",
-      instructions: instructions ?? "",
-      isDefault: isDefault ?? false,
+      role: role ?? existing.role,
+      tone: tone ?? existing.tone,
+      language: language ?? existing.language,
+      emojiStyle: emojiStyle ?? existing.emojiStyle,
+      instructions: instructions ?? existing.instructions,
+      isDefault: isDefault ?? existing.isDefault,
     },
   });
 
-  return NextResponse.json(persona, { status: 201 });
+  return NextResponse.json(updated);
 }
