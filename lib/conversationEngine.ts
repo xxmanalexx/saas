@@ -103,6 +103,10 @@ export async function processMessage(
     }),
   ]);
 
+  // DEBUG: log persona state so we can see exactly what the AI sees
+  console.log(`[conversationEngine] workspaceId=${workspaceId}`);
+  console.log(`[conversationEngine] persona found:`, persona ? JSON.stringify({ id: persona.id, name: persona.name, instructions: persona.instructions, isDefault: persona.isDefault }) : "NULL");
+
   // Build knowledge base context string
   const knowledgeContext = kbEntries.length > 0
     ? "\n\n--- BUSINESS KNOWLEDGE BASE ---\n" +
@@ -112,6 +116,11 @@ export async function processMessage(
 
   // Build persona context string using the structured builder
   const personaContext = buildPersonaContext(persona);
+  console.log(`[conversationEngine] personaContext length: ${personaContext.length} chars`);
+  if (personaContext.length > 0) {
+    const snippet = personaContext.slice(0, 200).replace(/\n/g, " | ");
+    console.log(`[conversationEngine] personaContext preview: ${snippet}...`);
+  }
 
   // ── 1. Get or create contact ──────────────────────────────────────────────
   const contact = await db.contact.upsert({

@@ -68,6 +68,9 @@ Respond ONLY with a JSON object with keys: intent, confidence, agentType, reason
     { role: "user", content: `Customer message to classify: "${message}"` },
   ];
 
+  console.log(`[RouterAgent] systemPrompt length: ${systemPrompt.length}`);
+  console.log(`[RouterAgent] first 300 chars of prompt:\n${systemPrompt.slice(0, 300)}`);
+
   const response = await aiComplete(messages, aiOpts);
 
   try {
