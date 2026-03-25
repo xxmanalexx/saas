@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateSocket, getConnectionStatus, sendWhatsAppMessage } from "@/lib/whatsappBaileys";
+import { getOrCreateSocket, getConnectionStatus, sendWhatsAppMessage, sendTypingIndicator } from "@/lib/whatsappBaileys";
 import { db } from "@/lib/db";
 import { aiStream } from "@/lib/ai";
 import { buildPersonaContext } from "@/lib/conversationEngine";
@@ -124,11 +124,16 @@ export async function POST(req: NextRequest) {
           ];
 
           // Stream tokens and accumulate
-          for await (const token of aiStream(streamMessages, {
-            ollamaUrl: ollamaCfg.ollamaUrl,
-            model: ollamaCfg.ollamaModel,
-          })) {
-            fullResponse += token;
+          await sendTypingIndicator(remoteJid, true);
+          try {
+            for await (const token of aiStream(streamMessages, {
+              ollamaUrl: ollamaCfg.ollamaUrl,
+              model: ollamaCfg.ollamaModel,
+            })) {
+              fullResponse += token;
+            }
+          } finally {
+            await sendTypingIndicator(remoteJid, false);
           }
 
           console.log(`[WhatsApp] AI streamed response: "${fullResponse.slice(0, 80)}"`);

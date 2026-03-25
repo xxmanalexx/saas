@@ -192,6 +192,21 @@ export async function sendWhatsAppMessage(
   }
 }
 
+// ─── Send typing indicator ────────────────────────────────────────────────────
+
+export async function sendTypingIndicator(
+  jid: string,
+  typing: boolean
+): Promise<void> {
+  if (!socket || connStatus !== "connected") return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await socket.sendPresenceUpdate(typing ? "composing" : "paused", jid as any);
+  } catch (err) {
+    console.error("[WhatsApp] presence update error:", err);
+  }
+}
+
 // ─── Status ─────────────────────────────────────────────────────────────────
 
 export function getConnectionStatus() {
