@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { id, name, role, tone, language, emojiStyle, instructions, isDefault } = body;
+  const { id, name, role, tone, language, emojiStyle, instructions, isDefault, dialect } = body;
 
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
@@ -60,6 +60,7 @@ export async function PATCH(req: NextRequest) {
       role: role ?? existing.role,
       tone: tone ?? existing.tone,
       language: language ?? existing.language,
+      dialect: dialect ?? existing.dialect,
       emojiStyle: emojiStyle ?? existing.emojiStyle,
       instructions: instructions !== undefined ? instructions : existing.instructions,
       isDefault: isDefault ?? existing.isDefault,

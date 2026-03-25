@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { aiStream } from "@/lib/ai";
 import { buildPersonaContext } from "@/lib/conversationEngine";
 import { getOllamaConfig } from "@/lib/ollamaConfig";
+import { transcribeAudio } from "@/lib/whisperTranscriber";
 import type { AiMessage } from "@/lib/ai";
 import type { Channel } from "@prisma/client";
 
@@ -27,9 +28,25 @@ export async function POST(req: NextRequest) {
       async (incoming) => {
         // ── AI message processing ─────────────────────────────────────────
         try {
-          const { remoteJid, text, pushName, messageId } = incoming;
+          const { remoteJid, text: incomingText, pushName, messageId, audioBuffer, mimeType, hasAudio } = incoming;
+          let { text } = incoming;
+          let usedVoiceNote = false;
 
-          console.log(`[WhatsApp] raw incoming | jid="${remoteJid}" | text="${text}" | fromMe=${incoming.fromMe}`);
+          // If this is a voice note without text, transcribe it
+          if (!text && hasAudio && audioBuffer) {
+            console.log(`[WhatsApp] Received voice note, transcribing...`);
+            const result = await transcribeAudio(audioBuffer, mimeType ?? "audio/ogg");
+            if (result.success && result.text) {
+              text = result.text;
+              usedVoiceNote = true;
+              console.log(`[WhatsApp] Transcription: "${result.text.slice(0, 60)}"`);
+            } else {
+              text = "عذراً، ما قدرت أفهم الرسالة الصوتية. ممكن تكتب لي؟ 😊";
+              console.log(`[WhatsApp] Transcription failed: ${result.error}`);
+            }
+          }
+
+          console.log(`[WhatsApp] raw incoming | jid="${remoteJid}" | text="${text}" | fromMe=${incoming.fromMe} | voiceNote=${usedVoiceNote}`);
 
           if (!text || !remoteJid) {
             console.log(`[WhatsApp] Skipping: missing text or jid`);

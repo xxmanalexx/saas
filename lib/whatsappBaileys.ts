@@ -29,6 +29,9 @@ export interface WhatsAppIncomingMessage {
   text: string;
   pushName: string | null;
   timestamp: number;
+  audioBuffer?: Buffer;
+  mimeType?: string;
+  hasAudio?: boolean;
 }
 
 // ─── In-memory state (survives hot reload within same process) ─────────────────
@@ -63,6 +66,9 @@ function extractText(msg: any): string {
     msg.imageMessage?.caption ||
     msg.videoMessage?.caption ||
     msg.documentWithCaptionMessage?.message?.documentMessage?.caption ||
+    msg.extendedTextMessage?.contextInfo?.quotedMessage?.conversation ||
+    // Voice notes (ptt = push-to-talk)
+    (msg.ptvMessage ? "[🎤 صوتية]" : "") ||
     ""
   );
 }
@@ -156,7 +162,11 @@ export async function getOrCreateSocket(
       console.log(`[Baileys] msg upsert | jid="${rawJid}" | text="${rawText}" | types="${msgTypes}" | fromMe=${m.key?.fromMe}`);
 
       if (m.key?.fromMe) continue;
-      if (!rawText && !m.message?.imageMessage && !m.message?.videoMessage) continue;
+      if (!rawText && !m.message?.imageMessage && !m.message?.videoMessage && !m.message?.audioMessage) continue;
+
+      const audioMessage = m.message?.audioMessage;
+      const audioBuffer = audioMessage?.url ? Buffer.from(audioMessage.url, "base64") : null;
+      const mimeType = audioMessage?.mimetype ?? "audio/ogg";
 
       const incoming: WhatsAppIncomingMessage = {
         remoteJid: rawJid,
@@ -165,6 +175,9 @@ export async function getOrCreateSocket(
         text: rawText,
         pushName: m.pushName ?? null,
         timestamp: Number(m.messageTimestamp ?? 0),
+        audioBuffer: audioBuffer ?? undefined,
+        mimeType,
+        hasAudio: Boolean(audioMessage),
       };
 
       if (messageHandler) {

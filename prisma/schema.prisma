@@ -339,6 +339,7 @@ model AgentPersona {
   role        PersonaRole @default(SUPPORT)
   tone        PersonaTone @default(FRIENDLY)
   language    String      @default("en") // en, ar, hi, fr, etc.
+  dialect     String      @default("")   // khaliji, iraqi, shami, egyptian, maghrebi, saudi, or empty
   emojiStyle  EmojiStyle  @default(SOMETIMES)
   instructions String    @db.Text @default("")
   isDefault   Boolean     @default(false)

@@ -8,6 +8,7 @@ interface Persona {
   role: string;
   tone: string;
   language: string;
+  dialect: string;
   emojiStyle: string;
   instructions: string;
   isDefault: boolean;
@@ -49,6 +50,7 @@ export default function SettingsPage() {
     role: "SUPPORT",
     tone: "FRIENDLY",
     language: "en",
+    dialect: "",
     emojiStyle: "SOMETIMES",
     instructions: "",
     isDefault: true,
@@ -253,20 +255,39 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#334155] mb-1.5">
-                Instructions <span className="text-[#94A3B8] font-normal">(optional)</span>
-              </label>
-              <textarea
-                value={persona.instructions}
-                onChange={(e) => setPersona((p) => ({ ...p, instructions: e.target.value }))}
-                placeholder="E.g. Always greet warmly. Ask for the customer's name before proceeding. If they ask about pricing, redirect to the pricing page."
-                rows={4}
-                className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853] resize-none"
-              />
-              <p className="text-xs text-[#94A3B8] mt-1.5">
-                These instructions are injected into every AI response to guide the agent's behavior.
-              </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-[#334155] mb-1.5">
+                  Instructions <span className="text-[#94A3B8] font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={persona.instructions}
+                  onChange={(e) => setPersona((p) => ({ ...p, instructions: e.target.value }))}
+                  placeholder="E.g. Always greet warmly. Ask for the customer's name before proceeding. If they ask about pricing, redirect to the pricing page."
+                  rows={4}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853] resize-none"
+                />
+                <p className="text-xs text-[#94A3B8] mt-1.5">
+                  These instructions are injected into every AI response to guide the agent's behavior.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[#64748B]">Dialect</label>
+                <select
+                  value={persona.dialect}
+                  onChange={(e) => setPersona({ ...persona, dialect: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm text-[#0A0F1C] focus:outline-none focus:border-[#00C853]"
+                >
+                  <option value="">None (standard)</option>
+                  <option value="khaliji">Khaliji (Gulf Arabic)</option>
+                  <option value="iraqi">Iraqi Arabic</option>
+                  <option value="shami">Shami (Levantine)</option>
+                  <option value="egyptian">Egyptian Arabic</option>
+                  <option value="maghrebi">Maghrebi Arabic</option>
+                  <option value="saudi">Saudi Arabic</option>
+                </select>
+                <p className="text-xs text-[#94A8B8]">Helps AI speak in the customer's dialect</p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

@@ -52,6 +52,19 @@ export function buildPersonaContext(persona: AgentPersona | null): string {
   const lang = hasArabic ? "ar" : persona.language;
   lines.push(langInstructions[lang] ?? langInstructions.en);
 
+  // Dialect — shapes specific dialect of Arabic or language variant
+  const dialectInstructions: Record<string, string> = {
+    khaliji:   "Speak in Khaliji (Gulf Arabic) dialect — use Gulf Arabic vocabulary and expressions.",
+    iraqi:     "Speak in Iraqi Arabic dialect.",
+    shami:     "Speak in Shami (Levantine) Arabic dialect.",
+    egyptian:  "Speak in Egyptian Arabic dialect.",
+    maghrebi:  "Speak in Maghrebi Arabic dialect.",
+    saudi:     "Speak in Saudi Arabic dialect.",
+  };
+  if (persona.dialect && dialectInstructions[persona.dialect]) {
+    lines.push(dialectInstructions[persona.dialect]);
+  }
+
   // Emoji style — concrete rule the model actually follows
   const emojiRules: Record<string, string> = {
     NEVER:    "Do NOT use emojis.",
