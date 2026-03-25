@@ -147,9 +147,14 @@ export async function POST(req: NextRequest) {
             for await (const token of aiStream(streamMessages, {
               ollamaUrl: ollamaCfg.ollamaUrl,
               model: ollamaCfg.ollamaModel,
+              thinking: ollamaCfg.ollamaThinking,
             })) {
               fullResponse += token;
             }
+          } catch (err) {
+            console.error("[WhatsApp] aiStream error:", err);
+            // Timeout or stream error — send fallback so user isn't left hanging
+            fullResponse = "عذراً، استغرق الرد وقتاً طويلاً. حاول مرة أخرى.";
           } finally {
             await sendTypingIndicator(remoteJid, false);
           }
