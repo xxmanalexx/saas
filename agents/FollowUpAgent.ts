@@ -1,89 +1,136 @@
-import { aiCompleteSimple } from "@/lib/ai";
 import { db } from "@/lib/db";
-import type { Lead, Contact } from "@prisma/client";
+import { aiCompleteSimple } from "@/lib/ai";
+import { getOllamaConfig } from "@/lib/ollamaConfig";
+import { sendWhatsAppMessage } from "@/lib/whatsappBaileys";
 
 export interface FollowUpResult {
   sent: boolean;
+  conversationId: string;
   channel: string;
   response: string;
 }
 
-interface FollowUpConfig {
-  coldLeadDays: number; // follow up after N days of silence
-  maxFollowUps: number;
-  messageTemplates: {
-    first: string;
-    second: string;
-    last: string;
-  };
-}
+/**
+ * Find all active conversations that need a follow-up message and send them.
+ * Called by the cron job.
+ */
+export async function runFollowUpJob(workspaceId: string): Promise<FollowUpResult[]> {
+  const results: FollowUpResult[] = [];
 
-const DEFAULT_TEMPLATES = {
-  first: "Hi {{name}}! Just checking in — did you have any questions about Rana? Happy to help if you're ready to get started.",
-  second: "Hi {{name}}! Just a gentle reminder we're here if you need anything. Feel free to reply anytime or book a call: [link]",
-  last: "Hi {{name}} — I don't want to overdo it! If you're not ready yet, no worries at all. But if you ever want to revisit Rana, we'll be here. 😊",
-};
-
-export async function followUpAgent(
-  workspaceId: string,
-  lead: Lead & { contact: Contact },
-  config?: Partial<FollowUpConfig>
-): Promise<FollowUpResult> {
-  const cfg: FollowUpConfig = {
-    coldLeadDays: config?.coldLeadDays ?? 3,
-    maxFollowUps: config?.maxFollowUps ?? 3,
-    messageTemplates: { ...DEFAULT_TEMPLATES, ...config?.messageTemplates },
-  };
-
-  const lastEvent = await db.leadEvent.findFirst({
-    where: { leadId: lead.id },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const daysSinceLastContact = lastEvent
-    ? Math.floor(
-        (Date.now() - new Date(lastEvent.createdAt).getTime()) / (1000 * 60 * 60 * 24)
-      )
-    : 999;
-
-  if (daysSinceLastContact < cfg.coldLeadDays) {
-    return { sent: false, channel: "none", response: "Too soon to follow up" };
-  }
-
-  // Determine which follow-up this is
-  const followUpCount = await db.leadEvent.count({
-    where: { leadId: lead.id, type: "follow_up_sent" },
-  });
-
-  let template: string;
-  if (followUpCount === 0) template = cfg.messageTemplates.first;
-  else if (followUpCount < cfg.maxFollowUps - 1) template = cfg.messageTemplates.second;
-  else template = cfg.messageTemplates.last;
-
-  const contactName =
-    (lead.contact.profile as Record<string, string>)?.name ?? "there";
-  const message = template.replace("{{name}}", contactName);
-
-  // Log the follow-up
-  await db.leadEvent.create({
-    data: {
-      leadId: lead.id,
-      type: "follow_up_sent",
-      data: {
-        message,
-        followUpNumber: followUpCount + 1,
-        channel: lead.contact.channel,
-      },
+  const workspace = await db.workspace.findUnique({
+    where: { id: workspaceId },
+    select: {
+      followUpEnabled: true,
+      followUpDelayMinutes: true,
+      followUpInstructions: true,
+      followUpMessage: true,
     },
   });
 
-  // In production: actually send via WhatsApp/IG/email here
-  // For now: log and return
-  console.log(`[FollowUpAgent] Would send to ${lead.contact.channelIdentifier}: ${message}`);
+  if (!workspace?.followUpEnabled) {
+    return results;
+  }
 
-  return {
-    sent: true,
-    channel: lead.contact.channel,
-    response: message,
-  };
+  const delayMs = (workspace.followUpDelayMinutes ?? 300) * 60 * 1000;
+  const cutoff = new Date(Date.now() - delayMs);
+
+  // Find active conversations where:
+  // 1. No follow-up has been sent yet
+  // 2. The last message is from the CUSTOMER (AI should not double-message)
+  // 3. The last customer message is older than the configured delay
+  const conversations = await db.conversation.findMany({
+    where: {
+      workspaceId,
+      status: "ACTIVE",
+      followUpSentAt: null,
+      messages: {
+        some: {
+          role: "USER",
+        },
+      },
+    },
+    include: {
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      contact: true,
+    },
+  });
+
+  for (const conv of conversations) {
+    const lastMsg = conv.messages[0];
+    if (!lastMsg || lastMsg.role !== "USER") continue;
+
+    // Only follow up if the last customer message is old enough
+    if (lastMsg.createdAt > cutoff) continue;
+
+    // Use workspace message template, or a sensible default
+    const baseMessage = workspace.followUpMessage?.trim()
+      || "Hi! Just checking in — are you still there? I'd love to help if you have any questions. 😊";
+
+    let finalMessage = baseMessage;
+
+    // If AI guidance is provided, ask the AI to tailor the message
+    if (workspace.followUpInstructions?.trim()) {
+      const contactName =
+        (conv.contact?.profile as Record<string, string>)?.name ?? "there";
+
+      const systemPrompt = `You are a helpful sales assistant. The customer's name is "${contactName}".`;
+      const userPrompt = `Based on this conversation context, write a short, friendly follow-up message (max 2 sentences) to send to the customer. Do NOT be pushy. Do NOT mention "AI" or "automated".
+
+Customer's name: ${contactName}
+
+AI Guidance: ${workspace.followUpInstructions}
+
+Write ONLY the message in Arabic or English as appropriate. No quotes, no explanation.`;
+
+      try {
+        const aiResult = await aiCompleteSimple(userPrompt, systemPrompt, {
+          temperature: 0.7,
+          timeoutMs: 30_000,
+        });
+        if (aiResult.content && aiResult.content.trim().length > 0) {
+          finalMessage = aiResult.content.trim();
+        }
+      } catch (err) {
+        console.warn(`[FollowUpAgent] AI tailoring failed, using template: ${err}`);
+      }
+    }
+
+    // Send via WhatsApp
+    if (conv.channel === "WHATSAPP" && conv.channelId) {
+      try {
+        await sendWhatsAppMessage(conv.channelId, finalMessage);
+        await db.conversation.update({
+          where: { id: conv.id },
+          data: { followUpSentAt: new Date() },
+        });
+        await db.message.create({
+          data: {
+            conversationId: conv.id,
+            role: "ASSISTANT",
+            content: finalMessage,
+          },
+        });
+        await db.agentLog.create({
+          data: {
+            agentId: "follow-up",
+            input: { conversationId: conv.id, type: "auto_follow_up" },
+            output: { response: finalMessage, channel: conv.channel },
+          },
+        }).catch(() => {});
+        results.push({
+          sent: true,
+          conversationId: conv.id,
+          channel: conv.channel,
+          response: finalMessage,
+        });
+      } catch (err) {
+        console.error(`[FollowUpAgent] Failed to send to ${conv.channelId}:`, err);
+      }
+    }
+  }
+
+  return results;
 }

@@ -22,6 +22,10 @@ export async function GET() {
       ollamaModel: true,
       ollamaThinking: true,
       databaseUrl: true,
+      followUpEnabled: true,
+      followUpDelayMinutes: true,
+      followUpInstructions: true,
+      followUpMessage: true,
       personas: {
         where: { isDefault: true },
         take: 1,
@@ -39,6 +43,10 @@ export async function GET() {
     ollamaModel: workspace.ollamaModel,
     ollamaThinking: workspace.ollamaThinking,
     databaseUrl: workspace.databaseUrl ?? "",
+    followUpEnabled: workspace.followUpEnabled,
+    followUpDelayMinutes: workspace.followUpDelayMinutes,
+    followUpInstructions: workspace.followUpInstructions,
+    followUpMessage: workspace.followUpMessage,
     defaultPersona: workspace.personas[0] ?? null,
   });
 }
@@ -48,7 +56,7 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, settings, ollamaUrl, ollamaModel, ollamaThinking, databaseUrl } = body;
+  const { name, settings, ollamaUrl, ollamaModel, ollamaThinking, databaseUrl, followUpEnabled, followUpDelayMinutes, followUpInstructions, followUpMessage } = body;
 
   const workspace = await db.workspace.findFirst({
     where: { userId: session.user.id },
@@ -65,6 +73,10 @@ export async function PATCH(req: NextRequest) {
       ...(ollamaModel !== undefined && { ollamaModel }),
       ...(ollamaThinking !== undefined && { ollamaThinking }),
       ...(databaseUrl !== undefined && { databaseUrl }),
+      ...(followUpEnabled !== undefined && { followUpEnabled }),
+      ...(followUpDelayMinutes !== undefined && { followUpDelayMinutes }),
+      ...(followUpInstructions !== undefined && { followUpInstructions }),
+      ...(followUpMessage !== undefined && { followUpMessage }),
     },
     select: {
       id: true,
@@ -74,6 +86,10 @@ export async function PATCH(req: NextRequest) {
       ollamaModel: true,
       ollamaThinking: true,
       databaseUrl: true,
+      followUpEnabled: true,
+      followUpDelayMinutes: true,
+      followUpInstructions: true,
+      followUpMessage: true,
     },
   });
 

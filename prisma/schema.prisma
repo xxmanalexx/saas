@@ -79,6 +79,12 @@ model Workspace {
   ollamaThinking Boolean @default(true)
   // Optional custom database connection string (overrides env DATABASE_URL)
   databaseUrl  String?  @default("")
+
+  // Follow-up config
+  followUpEnabled       Boolean @default(false)
+  followUpDelayMinutes  Int     @default(300) // 5 hours after last customer message
+  followUpInstructions  String  @default("")
+  followUpMessage       String  @default("") // the actual follow-up message template
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -127,6 +133,7 @@ model Conversation {
   contactId    String?
   status       ConversationStatus @default(ACTIVE)
   assignedTo   String?           // human agent ID if escalated
+  followUpSentAt DateTime?       // timestamp when auto follow-up was sent
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 

@@ -3,7 +3,6 @@ import { routerAgent, shouldEscalate } from "@/agents/RouterAgent";
 import { leadQualificationAgent } from "@/agents/LeadQualificationAgent";
 import { supportAgent } from "@/agents/SupportAgent";
 import { bookingAgent } from "@/agents/BookingAgent";
-import { followUpAgent } from "@/agents/FollowUpAgent";
 import { getOllamaConfig } from "@/lib/ollamaConfig";
 import type { AiMessage } from "@/lib/ai";
 import type { AgentType, AgentPersona, Channel, Conversation, Contact } from "@prisma/client";

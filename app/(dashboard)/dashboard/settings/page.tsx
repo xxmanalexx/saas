@@ -21,6 +21,10 @@ interface Settings {
   ollamaModel: string;
   ollamaThinking: boolean;
   databaseUrl: string;
+  followUpEnabled: boolean;
+  followUpDelayMinutes: number;
+  followUpInstructions: string;
+  followUpMessage: string;
   defaultPersona: Persona | null;
 }
 
@@ -85,6 +89,10 @@ export default function SettingsPage() {
           ollamaUrl: settings.ollamaUrl,
           ollamaModel: settings.ollamaModel,
           ollamaThinking: settings.ollamaThinking,
+          followUpEnabled: settings.followUpEnabled,
+          followUpDelayMinutes: settings.followUpDelayMinutes,
+          followUpInstructions: settings.followUpInstructions,
+          followUpMessage: settings.followUpMessage,
         }),
       });
 
@@ -222,6 +230,95 @@ export default function SettingsPage() {
                   }`}
                 />
               </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Follow-up ── */}
+        <section className="bg-white rounded-2xl border border-[#E2E8F0] p-6">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔔</span>
+              <h2 className="font-semibold text-[#0A0F1C]">Follow-up</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettings((s) => s ? { ...s, followUpEnabled: !s.followUpEnabled } : s)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                settings?.followUpEnabled ? "bg-[#00C853]" : "bg-[#CBD5E1]"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  settings?.followUpEnabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+          <p className="text-xs text-[#64748B] mb-4">Automatically send a follow-up message if the customer hasn't replied.</p>
+
+          <div className={`space-y-4 ${settings?.followUpEnabled ? "opacity-100" : "opacity-50 pointer-events-none"}`}>
+            {/* Delay */}
+            <div>
+              <label className="block text-sm font-medium text-[#334155] mb-1.5">Time after last customer message</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={72}
+                  value={Math.floor((settings?.followUpDelayMinutes ?? 300) / 60)}
+                  onChange={(e) => setSettings((s) => s ? { ...s, followUpDelayMinutes: Math.max(0, parseInt(e.target.value) || 0) * 60 } : s)}
+                  className="w-24 px-3 py-2 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853]"
+                />
+                <span className="text-sm text-[#64748B]">Hours</span>
+                <span className="text-[#94A3B8]">:</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={(settings?.followUpDelayMinutes ?? 300) % 60}
+                  onChange={(e) => {
+                    const hours = Math.floor((settings?.followUpDelayMinutes ?? 300) / 60);
+                    const mins = Math.max(0, Math.min(59, parseInt(e.target.value) || 0));
+                    setSettings((s) => s ? { ...s, followUpDelayMinutes: hours * 60 + mins } : s);
+                  }}
+                  className="w-24 px-3 py-2 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853]"
+                />
+                <span className="text-sm text-[#64748B]">Minutes</span>
+              </div>
+            </div>
+
+            {/* AI Guidance */}
+            <div>
+              <label className="block text-sm font-medium text-[#334155] mb-1.5">
+                AI Guidance <span className="text-[#94A3B8] font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={settings?.followUpInstructions ?? ""}
+                onChange={(e) => setSettings((s) => s ? { ...s, followUpInstructions: e.target.value } : s)}
+                placeholder="Instructions for the AI agent when sending the follow-up. Example: 'Try to get the user to continue the chat, or get an indicative answer that they no longer have any questions'"
+                rows={3}
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853] resize-none"
+              />
+            </div>
+
+            {/* Follow-up Message */}
+            <div>
+              <label className="block text-sm font-medium text-[#334155] mb-1.5">Follow-up message</label>
+              <textarea
+                value={settings?.followUpMessage ?? ""}
+                onChange={(e) => setSettings((s) => s ? { ...s, followUpMessage: e.target.value } : s)}
+                placeholder="Hi! Just checking in — are you still there? I'd love to help with anything you need."
+                rows={3}
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] text-[#0A0F1C] focus:outline-none focus:border-[#00C853] resize-none"
+              />
+            </div>
+
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+              <span className="text-sm text-[#64748B] mt-0.5">ℹ️</span>
+              <p className="text-xs text-[#64748B]">
+                Follow-up messages only work when an AI agent is handling the chat, not human agents.
+              </p>
             </div>
           </div>
         </section>
