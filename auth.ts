@@ -35,7 +35,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
 
         // Seed default persona so agents always have personaContext
-        await db.agentPersona.create({
+        const defaultPersona = await db.agentPersona.create({
           data: {
             workspaceId: workspace.id,
             name: "Rana",

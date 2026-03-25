@@ -98,8 +98,12 @@ export async function processMessage(
       where: { workspaceId, isActive: true },
       orderBy: { createdAt: "desc" },
     }),
+    // Fall back to ANY persona if none is marked default, so the agent
+    // always has persona context (prevents silent failures when isDefault
+    // wasn't set during seeding or persona creation)
     db.agentPersona.findFirst({
-      where: { workspaceId, isDefault: true },
+      where: { workspaceId },
+      orderBy: { isDefault: "desc" }, // default persona first, any persona as fallback
     }),
   ]);
 
