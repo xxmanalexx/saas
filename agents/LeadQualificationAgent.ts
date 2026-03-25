@@ -112,22 +112,20 @@ Respond ONLY as JSON with fields: score (0-100), stage (HOT|WARM|COLD), summary 
   try {
     const raw = JSON.parse(result.content);
     parsed = {
-      score: Number(raw.score) || 50,
-      stage: String(raw.stage ?? "WARM"),
+      score: Number(raw.score) || Number(raw.qualifications?.fit_score) || 50,
+      stage: String(raw.stage ?? raw.qualifications?.stage ?? "WARM"),
       suggestedAction: String(raw.suggestedAction ?? "nurture"),
       summary: String(raw.summary ?? ""),
-      // response must be a non-JSON string — if it looks like it could be JSON, extract it
-      response: typeof raw.response === "string" && raw.response.startsWith("{")
-        ? result.content  // AI returned raw JSON instead of a readable response
-        : String(raw.response ?? result.content),
+      response: typeof raw.response === "string" ? raw.response : result.content,
     };
   } catch { /* use defaults */ }
 
-  // Guard: if response is still JSON-ish (parse failed), return a readable fallback
+  // Guard: if response still looks like JSON (parse succeeded but response field
+  // contained nested JSON, not a readable string), fall back to raw content
   let finalResponse = parsed.response;
-  if (!finalResponse || finalResponse.startsWith("{") || finalResponse.startsWith("[")) {
-    console.warn("[LeadQualificationAgent] response looked like JSON, using content directly");
-    finalResponse = result.content;
+  if (!finalResponse || finalResponse.startsWith("{")) {
+    console.warn("[LeadQualificationAgent] response was not a readable string, using raw content");
+    finalResponse = result.content.trim();
   }
 
   const stageMap: Record<string, "QUALIFIED" | "CONTACTED" | "NEW"> = {

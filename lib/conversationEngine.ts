@@ -265,6 +265,15 @@ export async function processMessage(
     }
   }
 
+  // ── 5b. Safety net: never send raw JSON to the customer ────────────────────
+  if (typeof agentResponse !== "string" || !agentResponse.trim() || agentResponse.startsWith("{")) {
+    console.error("[conversationEngine] agentResponse was garbage, replacing with fallback", {
+      agentUsed: agentType,
+      responsePreview: String(agentResponse).slice(0, 100),
+    });
+    agentResponse = "أهلاً! أنا هنا لمساعدتك. ممكن تحكيلي أكثر عن اللي بتحتاجه؟ 😊";
+  }
+
   // ── 6. Persist messages ───────────────────────────────────────────────────
   await db.message.createMany({
     data: [
