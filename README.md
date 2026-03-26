@@ -2,7 +2,7 @@
 
 > Autonomous AI agents that handle customer conversations across WhatsApp, Instagram, web chat, and email — built for MENA businesses.
 
-![Node](https://img.shields.io/badge/Node.js-22-green) ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![Prisma](https://img.shields.io/badge/Prisma-7-blue) ![Ollama](https://img.shields.io/badge/AI-Ollama-orange)
+![Node](https://img.shields.io/badge/Node.js-22-green) ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![Prisma](https://img.shields.io/badge/Prisma-7-blue) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue) ![Ollama](https://img.shields.io/badge/AI-Ollama-orange)
 
 ---
 
@@ -40,6 +40,7 @@
 
 ### Prerequisites
 - Node.js 22+
+- PostgreSQL (local or Neon cloud)
 - Ollama running (`ollama serve`) with a model pulled (e.g. `ollama pull qwen3.5:2b`)
 
 ### 1. Clone & Install
@@ -47,39 +48,45 @@
 ```bash
 git clone https://github.com/xxmanalexx/saas.git
 cd saas
-npm install
+npm install --legacy-peer-deps
 ```
 
-### 2. Set up database (choose one)
-
-**Option A — SQLite (zero-setup, recommended for dev)**
-
-```bash
-node scripts/setup-sqlite.js
-```
-
-Creates all 19 tables instantly via `better-sqlite3`. No CLI, no compilation, no external services.
-
-**Option B — PostgreSQL / Neon (production)**
-
-```bash
-# Create a project at neon.tech and copy the connection string
-# Then:
-cp prisma/schema.postgresql.prisma prisma/schema.prisma
-npx prisma generate
-npx prisma db push
-```
-
-Set in `.env`:
-```env
-DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
-```
-
-### 3. Configure environment
+### 2. Set up environment
 
 ```bash
 cp .env.example .env
 # Fill in the required values (see Environment Variables below)
+```
+
+### 3. Configure database
+
+**Option A — Local PostgreSQL with Prisma Dev (fastest local setup)**
+
+```bash
+# Start a local Postgres instance (creates 'app-local' database automatically)
+npx prisma dev --name app-local --detach
+
+# Set in .env:
+# DATABASE_URL="postgresql://postgres:password@localhost:5432/app-local"
+# DIRECT_URL="postgresql://postgres:password@localhost:5432/app-local"
+
+# Push schema to database
+npx prisma db push
+
+# Generate Prisma client
+npx prisma generate
+```
+
+**Option B — Neon PostgreSQL (cloud, production)**
+
+```bash
+# Create a project at neon.tech and copy the full connection string
+# Set in .env:
+# DATABASE_URL="postgresql://user:pass@ep-xxx.eu-west-2.aws.neon.tech/neondb?sslmode=require"
+# DIRECT_URL="postgresql://user:pass@ep-xxx.eu-west-2.aws.neon.tech/neondb?sslmode=require"
+
+npx prisma migrate dev --name init
+npx prisma generate
 ```
 
 ### 4. Run
@@ -92,44 +99,144 @@ Open [http://localhost:3000](http://localhost:3000) — OAuth login → dashboar
 
 ---
 
+## 🔧 Troubleshooting
+
+### `MissingSecret` / Auth errors on first load
+
+**Cause:** `NEXTAUTH_SECRET` is missing from `.env`.
+
+**Fix:** Add it to `.env`:
+```env
+NEXTAUTH_SECRET="any-random-string-here-min-32-chars"
+```
+Restart `npm run dev`. In development, the app falls back to a temporary secret if this is missing — production requires it.
+
+---
+
+### `session.user.id is undefined` / dashboard pages crash
+
+**Cause:** `auth.ts` callback isn't correctly mapping the user `id` into the session.
+
+**Fix:** Make sure `session.user.id` is being set in the JWT callback and session callback. Check `auth.ts`:
+```ts
+callbacks: {
+  session({ session, user }) {
+    if (session.user) session.user.id = user.id;
+    return session;
+  },
+  jwt({ token, user }) {
+    if (user) token.id = user.id;
+    return token;
+  },
+},
+```
+If pages still crash on first load after login, hard-refresh (`Ctrl+Shift+R`) — this is a session hydration timing issue, not a code bug.
+
+---
+
+### `prisma generate` fails with "Cannot find module"
+
+**Cause:** Prisma 7 generates the client to `src/generated/prisma/` instead of `node_modules/@prisma/client`. Imports pointing to `@prisma/client` for types are broken.
+
+**Fix:** The project uses a path alias — all type imports should use:
+```ts
+import type { Workspace, Integration } from "@/generated/prisma";
+```
+NOT from `@prisma/client`. If you added a new model, re-run `npx prisma generate` first, then import from `@/generated/prisma`.
+
+---
+
+### Database connection errors (`Connection refused` / `ECONNREFUSED`)
+
+**For local Prisma Dev:**
+```bash
+# Check if Prisma Dev is running
+npx prisma dev ls
+
+# Stop and restart
+npx prisma dev stop app-local
+npx prisma dev --name app-local --detach
+```
+
+**For Neon:**
+- Verify `DATABASE_URL` and `DIRECT_URL` in `.env` are both set and correct
+- Make sure `?sslmode=require` is present
+- Check the Neon dashboard — the branch may be suspended due to inactivity
+
+---
+
+### `prisma db push` or `prisma migrate` fails
+
+**Cause:** `DIRECT_URL` is not set or doesn't match `DATABASE_URL`.
+
+**Fix:** `prisma.config.ts` uses `DIRECT_URL` for CLI operations. Both must be set:
+```env
+DATABASE_URL="postgresql://..."   # app runtime
+DIRECT_URL="postgresql://..."      # Prisma CLI (migrate, db push)
+```
+If they differ (e.g. `DATABASE_URL` uses a pooler but `DIRECT_URL` uses a direct connection), make sure both are valid connection strings.
+
+---
+
+### `404` on dashboard API routes after deploy
+
+**Cause:** NextAuth session not resolving — API routes return `401`.
+
+**Fix:** Ensure `NEXTAUTH_URL` matches your deployment URL exactly (including protocol). For production, it must be `https://your-domain.com`, not `http://localhost:3000`.
+
+---
+
+### WhatsApp QR code doesn't scan / session won't pair
+
+- Delete `whatsapp-session.json` and re-scan the QR code
+- Make sure you're scanning with the same phone number that received the QR link
+- WhatsApp Web sessions expire — repeat the pairing process if disconnected
+
+---
+
+### Build succeeds but dashboard is blank or styles are broken
+
+```bash
+rm -rf .next
+npm run build
+npm run dev
+```
+
+---
+
 ## ⚙️ Environment Variables
 
 ```env
-# ── Database ────────────────────────────────────────────────────────────────
-# SQLite (default for dev — zero setup):
-DATABASE_URL="file:./data/rana.db"
+# ── Database (required) ─────────────────────────────────────────────────────
+DATABASE_URL=""      # App runtime connection
+DIRECT_URL=""        # Prisma CLI connection (migrate, db push)
 
-# PostgreSQL / Neon (production):
-# DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
-
-# ── Auth (NextAuth v5) ───────────────────────────────────────────────────────
-NEXTAUTH_SECRET="generate-with-openssl-rand-base64-32"
+# ── Auth (required in production) ─────────────────────────────────────────
+NEXTAUTH_SECRET=""   # min 32 chars — generate: openssl rand -base64 32
 NEXTAUTH_URL="http://localhost:3000"
 
 # GitHub OAuth App: github.com/settings/developers
 # Callback URL: http://localhost:3000/api/auth/callback/github
-GITHUB_CLIENT_ID="Ov23..."
-GITHUB_CLIENT_SECRET="..."
+GITHUB_CLIENT_ID=""
+GITHUB_CLIENT_SECRET=""
 
-# ── Ollama AI ────────────────────────────────────────────────────────────────
+# ── Ollama AI ──────────────────────────────────────────────────────────────
 OLLAMA_BASE_URL="http://localhost:11434"
 AI_MODEL="qwen3.5:2b"   # any Ollama model (qwen, llama3.2, mistral, etc.)
-# Set to "false" in Settings UI to disable extended thinking
 
-# ── WhatsApp (Baileys — local pairing) ─────────────────────────────────────
+# ── WhatsApp (Baileys — local pairing) ───────────────────────────────────
 WHATSAPP_SESSION_FILE="./whatsapp-session.json"
 
 # ── Stripe ──────────────────────────────────────────────────────────────────
-STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_PUBLISHABLE_KEY="pk_test_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."   # from: stripe listen --forward-to localhost:3000/api/webhooks/stripe
+STRIPE_SECRET_KEY=""
+STRIPE_PUBLISHABLE_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+STRIPE_STARTER_PRICE_ID=""
+STRIPE_GROWTH_PRICE_ID=""
+STRIPE_ENTERPRISE_PRICE_ID=""
 
-# ── Email (Resend) ──────────────────────────────────────────────────────────
-RESEND_API_KEY="re_..."
-
-# ── Optional Integrations ────────────────────────────────────────────────────
-CAL_COM_API_KEY="..."
-HUBSPOT_API_KEY="..."
+# ── Email (Resend) ─────────────────────────────────────────────────────────
+RESEND_API_KEY=""
 ```
 
 ---
@@ -138,50 +245,49 @@ HUBSPOT_API_KEY="..."
 
 ```
 saas/
+├── src/
+│   ├── generated/prisma/     # Prisma 7 generated client (do not edit)
+│   └── lib/prisma.ts        # Prisma client singleton
 ├── app/
-│   ├── (dashboard)/              # Protected dashboard routes
+│   ├── (dashboard)/          # Protected dashboard routes
 │   │   └── dashboard/
-│   │       ├── page.tsx         # Overview + stats
-│   │       ├── conversations/   # Live conversation monitoring
-│   │       ├── leads/           # Lead pipeline
-│   │       ├── analytics/       # Business analytics
-│   │       ├── settings/        # Workspace config, Ollama, persona
-│   │       └── integrations/    # Channel connections
+│   │       ├── page.tsx     # Overview + stats
+│   │       ├── conversations/  # Live conversation monitoring
+│   │       ├── leads/       # Lead pipeline
+│   │       ├── analytics/  # Business analytics
+│   │       ├── settings/   # Workspace config, Ollama, persona
+│   │       └── integrations/  # Channel connections
 │   └── api/
-│       ├── auth/                # NextAuth v5
+│       ├── auth/            # NextAuth v5
 │       ├── webhooks/
-│       │   ├── whatsapp/        # WhatsApp Baileys webhook
-│       │   ├── webchat/         # Web chat webhook
-│       │   └── stripe/         # Billing events
-│       ├── conversations/       # CRUD + clear history
-│       ├── leads/              # Lead management
-│       ├── settings/            # Workspace + Ollama config
-│       ├── personas/            # Agent persona management
-│       ├── analytics/           # Dashboard data
-│       ├── chat/completions/    # Chat API endpoint
-│       └── cron/follow-up/      # Follow-up job trigger
+│       │   ├── whatsapp/    # WhatsApp Baileys webhook
+│       │   ├── webchat/     # Web chat webhook
+│       │   └── stripe/      # Billing events
+│       ├── conversations/   # CRUD + clear history
+│       ├── leads/           # Lead management
+│       ├── settings/        # Workspace + Ollama config
+│       ├── personas/        # Agent persona management
+│       ├── analytics/       # Dashboard data
+│       ├── chat/completions/   # Chat API endpoint
+│       └── cron/follow-up/  # Follow-up job trigger
 ├── agents/
-│   ├── RouterAgent.ts           # Intent classification
-│   ├── LeadQualificationAgent.ts # Lead scoring
-│   ├── SupportAgent.ts          # FAQ + support
-│   ├── BookingAgent.ts          # Calendar booking
-│   └── FollowUpAgent.ts        # Auto follow-up
+│   ├── RouterAgent.ts       # Intent classification
+│   ├── LeadQualificationAgent.ts  # Lead scoring
+│   ├── SupportAgent.ts      # FAQ + support
+│   ├── BookingAgent.ts      # Calendar booking
+│   └── FollowUpAgent.ts     # Auto follow-up
 ├── lib/
-│   ├── conversationEngine.ts    # Central routing + agent orchestration
-│   ├── ai.ts                    # Ollama streaming client
-│   ├── db.ts                    # Dual-driver DB (PostgreSQL / SQLite)
-│   ├── whatsappBaileys.ts       # Baileys WhatsApp client
-│   ├── whisperTranscriber.ts    # Voice note → text
-│   ├── ollamaConfig.ts          # Workspace Ollama config (cached)
-│   └── triggerFollowUps.ts      # Fire-and-forget follow-up trigger
+│   ├── conversationEngine.ts  # Central routing + agent orchestration
+│   ├── ai.ts                 # Ollama streaming client
+│   ├── db.ts                 # Backward-compat DB export (→ src/lib/prisma)
+│   ├── whatsappBaileys.ts    # Baileys WhatsApp client
+│   ├── whisperTranscriber.ts # Voice note → text
+│   └── ollamaConfig.ts       # Workspace Ollama config (cached)
 ├── prisma/
-│   ├── schema.prisma            # Default: PostgreSQL schema
-│   ├── schema.postgresql.prisma # Explicit PostgreSQL variant
-│   └── schema.sqlite.prisma     # SQLite variant
-├── scripts/
-│   └── setup-sqlite.js          # Zero-setup SQLite init
+│   ├── schema.prisma         # PostgreSQL schema (single provider)
+│   └── migrations/           # Migration history (PostgreSQL only)
 └── channels/
-    └── whatsapp.ts              # WhatsApp channel adapter
+    └── webchat.ts            # Web chat channel adapter
 ```
 
 ---
@@ -257,7 +363,6 @@ Embed snippet (generated in Settings):
 - WhatsApp webhook verification via `WHATSAPP_VERIFY_TOKEN`
 - Stripe webhook signature verification
 - Ollama AI runs locally — no data leaves the server
-- `MEMORY.md` never exposed in shared/group chat contexts
 
 ---
 
@@ -267,11 +372,17 @@ Embed snippet (generated in Settings):
 
 ```bash
 # Set environment variables in dashboard
-DATABASE_URL="postgresql://..."   # Neon recommended
-NEXTAUTH_SECRET="..."
+DATABASE_URL="postgresql://..."      # Neon recommended
+DIRECT_URL="postgresql://..."         # Same as DATABASE_URL or direct connection
+NEXTAUTH_SECRET="..."                # min 32 chars
 NEXTAUTH_URL="https://your-domain.com"
 WHATSAPP_SESSION_FILE="/app/whatsapp-session.json"
 OLLAMA_BASE_URL="http://localhost:11434"  # Ollama must be running on the server
+```
+
+```bash
+# Run migrations on deploy
+npx prisma migrate deploy
 ```
 
 ### Vercel (limited)
@@ -292,9 +403,15 @@ sudo systemctl enable ollama
 
 ## 📊 Database Schema
 
-19 tables covering: workspaces, users, conversations, messages, contacts, leads, agents, personas, flows, integrations, agent logs, knowledge base.
+PostgreSQL only — 19 tables covering: workspaces, users, conversations, messages, contacts, leads, agents, personas, flows, integrations, agent logs, knowledge base.
 
-Migrations managed via Prisma 7. Switch between PostgreSQL and SQLite by swapping the schema file.
+Managed via Prisma 7 migrations. Generate the client after any schema change:
+
+```bash
+npx prisma generate   # Regenerate types after schema change
+npx prisma db push   # Apply schema changes (development)
+npx prisma migrate deploy  # Apply migrations (production)
+```
 
 ---
 
