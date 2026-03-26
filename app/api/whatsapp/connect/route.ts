@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
               workspaceId,
               channel: "WHATSAPP" as Channel,
               channelIdentifier: contactIdentifier,
-              profile: { name: pushName ?? "WhatsApp User" },
+              profile: JSON.stringify({ name: pushName ?? "WhatsApp User" }),
             },
           });
 
@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
               conversationId: conversation.id,
               role: "USER",
               content: text,
+              metadata: "{}",
             },
           });
 
@@ -174,6 +175,7 @@ export async function POST(req: NextRequest) {
               conversationId: conversation.id,
               role: "ASSISTANT",
               content: fullResponse,
+              metadata: "{}",
             },
           });
 
@@ -184,8 +186,8 @@ export async function POST(req: NextRequest) {
           await db.agentLog.create({
             data: {
               agentId: "whatsapp-inbound",
-              input: { content: text, messageId },
-              output: { response: fullResponse, agent: "streaming" },
+              input: JSON.stringify({ content: text, messageId }),
+              output: JSON.stringify({ response: fullResponse, agent: "streaming" }),
             },
           }).catch(() => {});
         } catch (err) {

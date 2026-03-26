@@ -46,7 +46,7 @@ export async function PATCH(
     data: {
       leadId: lead.id,
       type: "stage_change",
-      data: { from: lead.stage, to: stage },
+      data: JSON.stringify({ from: lead.stage, to: stage }),
     },
   });
 

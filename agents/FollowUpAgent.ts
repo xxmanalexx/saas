@@ -106,13 +106,14 @@ Write ONLY the message in Arabic or English as appropriate. No quotes, no explan
             conversationId: conv.id,
             role: "ASSISTANT",
             content: finalMessage,
+            metadata: "{}",
           },
         });
         await db.agentLog.create({
           data: {
             agentId: "follow-up",
-            input: { conversationId: conv.id, type: "auto_follow_up" },
-            output: { response: finalMessage, channel: conv.channel },
+            input: JSON.stringify({ conversationId: conv.id, type: "auto_follow_up" }),
+            output: JSON.stringify({ response: finalMessage, channel: conv.channel }),
           },
         }).catch(() => {});
         results.push({

@@ -151,12 +151,12 @@ export async function processMessage(
         channelIdentifier: contactIdentifier,
       },
     },
-    update: { profile: contactProfile },
+    update: { profile: JSON.stringify(contactProfile) },
     create: {
       workspaceId,
       channel,
       channelIdentifier: contactIdentifier,
-      profile: contactProfile,
+      profile: JSON.stringify(contactProfile),
     },
   });
 
@@ -206,6 +206,7 @@ export async function processMessage(
         conversationId: conversation.id,
         role: "ASSISTANT",
         content: handoverMessage,
+        metadata: "{}",
       },
     });
 
@@ -301,29 +302,30 @@ export async function processMessage(
   // ── 6. Persist messages ───────────────────────────────────────────────────
   await db.message.createMany({
     data: [
-      { conversationId: conversation.id, role: "USER", content },
-      { conversationId: conversation.id, role: "ASSISTANT", content: agentResponse },
+      { conversationId: conversation.id, role: "USER", content, metadata: "{}" },
+      { conversationId: conversation.id, role: "ASSISTANT", content: agentResponse, metadata: "{}" },
     ],
   });
 
   // ── 7. Update transcript ───────────────────────────────────────────────────
+  const newMessages = [
+    { role: "user", content, ts: new Date().toISOString() },
+    { role: "assistant", content: agentResponse, ts: new Date().toISOString() },
+  ];
+  const existing = await db.transcript.findUnique({
+    where: { conversationId: conversation.id },
+    select: { messages: true },
+  });
+  const allMessages = existing
+    ? [...(JSON.parse(existing.messages) as object[]), ...newMessages]
+    : newMessages;
   await db.transcript.upsert({
     where: { conversationId: conversation.id },
-    update: {
-      messages: {
-        push: [
-          { role: "user", content, ts: new Date().toISOString() },
-          { role: "assistant", content: agentResponse, ts: new Date().toISOString() },
-        ],
-      },
-    },
+    update: { messages: JSON.stringify(allMessages) },
     create: {
       workspaceId,
       conversationId: conversation.id,
-      messages: [
-        { role: "user", content, ts: new Date().toISOString() },
-        { role: "assistant", content: agentResponse, ts: new Date().toISOString() },
-      ],
+      messages: JSON.stringify(newMessages),
     },
   });
 

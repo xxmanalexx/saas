@@ -5,7 +5,7 @@ import { defineConfig } from "prisma/config";
 
 export default defineConfig({
   // The main schema used by the app
-  schema: "./prisma/schema.prisma",
+  schema: "./prisma/schema.sqlite.prisma",
   migrations: {
     path: "prisma/migrations",
   },

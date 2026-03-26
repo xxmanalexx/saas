@@ -71,12 +71,12 @@ export async function getOrCreateContact(
         channelIdentifier: identifier,
       },
     },
-    update: { profile },
+    update: { profile: JSON.stringify(profile) },
     create: {
       workspaceId,
       channel: "WEB_CHAT",
       channelIdentifier: identifier,
-      profile,
+      profile: JSON.stringify(profile),
     },
   });
   return contact;

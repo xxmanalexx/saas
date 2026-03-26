@@ -128,7 +128,8 @@ export async function GET() {
 
   // ── Avg response time from logs ──────────────────────────────────────────
   const latencies = agentLogs
-    .map((l) => (l.output as Record<string, unknown>)?.latencyMs as number | null)
+    .map((l) => (typeof l.output === "string" ? JSON.parse(l.output) : l.output) as Record<string, unknown>)
+    .map((o) => o?.latencyMs as number | null)
     .filter((v): v is number => v != null && v > 0);
   const avgResponseMs = latencies.length > 0
     ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)

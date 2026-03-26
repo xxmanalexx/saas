@@ -125,7 +125,7 @@ IMPORTANT: Respond with ONLY a short Arabic sentence the customer can read. Do N
 
   if (existingLead) {
     await db.lead.update({ where: { id: existingLead.id }, data: { score, stage: dbStage } });
-    await db.leadEvent.create({ data: { leadId: existingLead.id, type: "qualification_complete", data: { score, stage: dbStage } } });
+    await db.leadEvent.create({ data: { leadId: existingLead.id, type: "qualification_complete", data: JSON.stringify({ score, stage: dbStage }) } });
   }
 
   return {

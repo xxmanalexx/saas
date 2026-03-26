@@ -1,12 +1,10 @@
 generator client {
   provider   = "prisma-client-js"
   engineType = "client"
-  output   = "../node_modules/.prisma/client/sqlite"
 }
 
 datasource db {
   provider = "sqlite"
-  url = env("DATABASE_URL")
 }
 
 model Account {
@@ -73,7 +71,7 @@ model Workspace {
   id        String   @id @default(cuid())
   name      String
   userId    String
-  settings  Json     @default("{}")
+  settings String     @default("{}")     
   // Ollama AI config
   ollamaUrl    String   @default("http://localhost:11434")
   ollamaModel  String   @default("llama3.2")
@@ -110,7 +108,7 @@ model Agent {
   workspaceId String
   name        String
   type        AgentType
-  config      Json     @default("{}")
+  config     String     
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -169,7 +167,7 @@ model Message {
   conversationId String
   role           Role
   content        String   
-  metadata       Json     @default("{}")
+  metadata      String     
   tokensUsed     Int?
   latencyMs      Int?
   createdAt      DateTime @default(now())
@@ -188,7 +186,7 @@ model AgentMessage {
   agentId   String
   role      Role
   content   String   
-  metadata  Json     @default("{}")
+  metadata String     
   createdAt DateTime @default(now())
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -201,7 +199,7 @@ model Contact {
   workspaceId       String
   channel           Channel
   channelIdentifier String
-  profile           Json     @default("{}") // name, avatar, etc.
+  profile          String      // name, avatar, etc.
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -242,7 +240,7 @@ model LeadEvent {
   id        String   @id @default(cuid())
   leadId    String
   type      String   // stage_change, note_added, email_sent, call_logged
-  data      Json     @default("{}")
+  data     String     
   createdAt DateTime @default(now())
 
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -255,7 +253,7 @@ model Flow {
   workspaceId String
   name       String
   trigger    String   // event that starts this flow (e.g. "new_lead", "keyword:pricing")
-  nodes      Json     @default("[]") // array of FlowNode objects
+  nodes     String     // array of FlowNode objects
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -288,9 +286,9 @@ model Integration {
   id           String           @id @default(cuid())
   workspaceId  String
   channel      Channel
-  credentials  Json             @default("{}") // encrypted
+  credentials String              // encrypted
   status       IntegrationStatus @default(DISCONNECTED)
-  settings     Json             @default("{}")
+  settings    String             
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -312,7 +310,7 @@ model Transcript {
   id             String   @id @default(cuid())
   workspaceId    String
   conversationId String   @unique
-  messages       Json     @default("[]")
+  messages      String
   createdAt      DateTime @default(now())
 
   workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -322,8 +320,8 @@ model Transcript {
 model AgentLog {
   id        String   @id @default(cuid())
   agentId   String
-  input     Json
-  output    Json
+  input    String
+  output   String
   tokens    Int?
   latencyMs Int?
   createdAt DateTime @default(now())
