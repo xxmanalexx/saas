@@ -33,12 +33,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ignored: "no user message" });
   }
 
-  // Ignore group messages, status broadcasts, and ephemeral messages
-  const isGroup = message.id?.includes("@g.us");
-  const isBroadcast = message.id?.includes("@broadcast");
+  // Ignore group messages, status broadcasts, ephemeral messages, and privacy-hidden messages
+  const msgId: string = message.id ?? "";
+  const msgFrom: string = message.from ?? "";
+  const isGroup = msgId.includes("@g.us") || msgFrom.includes("@g.us");
+  const isBroadcast = msgId.includes("@broadcast") || msgFrom.includes("@broadcast");
   const isEphemeral = message.type === "ephemeral" || message.context?.is_ephemeral;
-  if (isGroup || isBroadcast || isEphemeral) {
-    return NextResponse.json({ ignored: `message type: ${message.type ?? "unknown"}` });
+  // lid = privacy-hidden sender (number replaced with local anonymous ID)
+  const isPrivacyHidden = msgFrom.includes("@lid");
+  if (isGroup || isBroadcast || isEphemeral || isPrivacyHidden) {
+    return NextResponse.json({ ignored: `filtered: ${message.type ?? "unknown"}` });
+  }
+
+  // Reject messages with no text content (images, documents, voice notes without caption)
+  const text = message.text?.body ?? "";
+  const hasMediaContent = message.type !== "text" && !text;
+  if (hasMediaContent) {
+    return NextResponse.json({ ignored: `media-only message: ${message.type}` });
   }
 
   const workspaceId = req.headers.get("x-workspace-id");
