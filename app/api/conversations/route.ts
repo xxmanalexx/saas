@@ -19,7 +19,8 @@ export async function GET() {
     where: { workspaceId: workspace.id },
     include: {
       contact: true,
-      messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      // Fetch last 50 messages for the modal preview
+      messages: { orderBy: { createdAt: "desc" }, take: 50 },
     },
     orderBy: { updatedAt: "desc" },
     take: 100,
