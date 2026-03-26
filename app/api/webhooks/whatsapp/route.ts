@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const result = await processMessage({
     workspaceId,
     channel: "WHATSAPP",
-    channelId: message.id,
+    channelId: message.from,   // phone number — one conversation thread per contact
     contactIdentifier: message.from,
     contactProfile: { name: contact.profile?.name ?? "Unknown" },
     content: message.text?.body ?? "",
