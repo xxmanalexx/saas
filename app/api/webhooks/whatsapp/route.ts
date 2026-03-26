@@ -5,7 +5,7 @@ import { processMessage } from "@/lib/conversationEngine";
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  // Verify Meta webhook (challenge response for webhook setup)
+  // ── 1. Webhook verification (Meta setup challenge) ──────────────────────
   if (req.nextUrl.searchParams.get("hub.mode") === "subscribe") {
     const challenge = req.nextUrl.searchParams.get("hub.challenge");
     const token = req.nextUrl.searchParams.get("hub.verify_token");
@@ -15,14 +15,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid verify token" }, { status: 403 });
   }
 
-  // Parse incoming WhatsApp message
+  // ── 2. Parse webhook payload ───────────────────────────────────────────────
   const entry = body.entry?.[0];
   const change = entry?.changes?.[0];
-  const message = change?.value?.messages?.[0];
-  const contact = change?.value?.contacts?.[0];
+  const value = change?.value ?? {};
 
-  if (!message || !contact) {
-    return NextResponse.json({ error: "No message found" }, { status: 400 });
+  // Ignore status updates and broadcast message events — they have no user messages
+  if (value.statuses || value.conversation_prediction) {
+    return NextResponse.json({ ignored: "status event" });
+  }
+
+  // Only process actual user-sent messages
+  const message = value.messages?.[0];
+  const contact = value.contacts?.[0];
+
+  if (!message || message.id === "false" || !contact) {
+    return NextResponse.json({ ignored: "no user message" });
+  }
+
+  // Ignore group messages, status broadcasts, and ephemeral messages
+  const isGroup = message.id?.includes("@g.us");
+  const isBroadcast = message.id?.includes("@broadcast");
+  const isEphemeral = message.type === "ephemeral" || message.context?.is_ephemeral;
+  if (isGroup || isBroadcast || isEphemeral) {
+    return NextResponse.json({ ignored: `message type: ${message.type ?? "unknown"}` });
   }
 
   const workspaceId = req.headers.get("x-workspace-id");
@@ -30,6 +46,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing x-workspace-id header" }, { status: 400 });
   }
 
+  // ── 3. Process message ─────────────────────────────────────────────────────
   const result = await processMessage({
     workspaceId,
     channel: "WHATSAPP",
@@ -39,7 +56,7 @@ export async function POST(req: NextRequest) {
     content: message.text?.body ?? "",
   });
 
-  // Send response back via WhatsApp API
+  // ── 4. Send AI response back to WhatsApp ──────────────────────────────────
   const { WhatsAppAdapter } = await import("@/channels/whatsapp");
   const adapter = new WhatsAppAdapter(
     process.env.WHATSAPP_ACCESS_TOKEN!,
