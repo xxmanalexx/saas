@@ -1,5 +1,5 @@
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
-const DEFAULT_MODEL = process.env.AI_MODEL ?? "llama3.2";
+const DEFAULT_MODEL = process.env.AI_MODEL ?? "qwen3.5:2b";
 
 export interface AiMessage {
   role: "system" | "user" | "assistant";

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   });
 
   const ollamaUrl = workspace?.ollamaUrl ?? "http://localhost:11434";
-  const model = workspace?.ollamaModel ?? "llama3.2";
+  const model = workspace?.ollamaModel ?? "qwen3.5:2b";
 
   // Build Ollama request
   const ollamaMessages = messages.map((m: { role: string; content: string }) => ({

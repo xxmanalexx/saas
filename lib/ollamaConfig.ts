@@ -28,7 +28,7 @@ export async function getOllamaConfig(workspaceId: string): Promise<OllamaConfig
 
   const config: OllamaConfig = {
     ollamaUrl: (workspace?.ollamaUrl as string | undefined) ?? "http://localhost:11434",
-    ollamaModel: (workspace?.ollamaModel as string | undefined) ?? "llama3.2",
+    ollamaModel: (workspace?.ollamaModel as string | undefined) ?? "qwen3.5:2b",
     ollamaThinking: (workspace?.ollamaThinking as boolean | undefined) ?? true,
     databaseUrl: workspace?.databaseUrl as string | undefined,
   };
