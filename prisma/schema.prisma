@@ -1,8 +1,7 @@
 generator client {
   provider   = "prisma-client-js"
-  // "client" = pure JS (no engine binary needed, works for both PostgreSQL and SQLite)
-  // "library" = native addon (better-sqlite3 must be compiled, uncomment if using SQLite directly)
   engineType = "client"
+  output   = "../node_modules/.prisma/client/postgresql"
 }
 
 datasource db {

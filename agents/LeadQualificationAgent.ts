@@ -30,7 +30,7 @@ export async function leadQualificationAgent(
   // Get existing lead
   const existingLead = await db.lead.findFirst({
     where: { workspaceId, contactId: contact.id },
-  });
+  }) as { id: string; score: number; notes: string } | null;
 
   const answeredCount = existingLead
     ? Object.keys(JSON.parse(JSON.stringify(existingLead.notes ?? "{}"))).length

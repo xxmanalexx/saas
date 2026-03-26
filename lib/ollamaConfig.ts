@@ -24,13 +24,13 @@ export async function getOllamaConfig(workspaceId: string): Promise<OllamaConfig
   const workspace = await db.workspace.findUnique({
     where: { id: workspaceId },
     select: { ollamaUrl: true, ollamaModel: true, ollamaThinking: true, databaseUrl: true },
-  });
+  }) as Record<string, unknown> | null;
 
   const config: OllamaConfig = {
-    ollamaUrl: workspace?.ollamaUrl ?? "http://localhost:11434",
-    ollamaModel: workspace?.ollamaModel ?? "llama3.2",
-    ollamaThinking: workspace?.ollamaThinking ?? true,
-    databaseUrl: workspace?.databaseUrl ?? undefined,
+    ollamaUrl: (workspace?.ollamaUrl as string | undefined) ?? "http://localhost:11434",
+    ollamaModel: (workspace?.ollamaModel as string | undefined) ?? "llama3.2",
+    ollamaThinking: (workspace?.ollamaThinking as boolean | undefined) ?? true,
+    databaseUrl: workspace?.databaseUrl as string | undefined,
   };
 
   cache.set(workspaceId, { config, expiresAt: Date.now() + TTL_MS });

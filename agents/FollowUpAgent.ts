@@ -25,56 +25,43 @@ export async function runFollowUpJob(workspaceId: string): Promise<FollowUpResul
       followUpInstructions: true,
       followUpMessage: true,
     },
-  });
+  }) as Record<string, unknown> | null;
 
   if (!workspace?.followUpEnabled) {
     return results;
   }
 
-  const delayMs = (workspace.followUpDelayMinutes ?? 300) * 60 * 1000;
+  const delayMs = ((workspace?.followUpDelayMinutes as number | null | undefined) ?? 300) * 60 * 1000;
   const cutoff = new Date(Date.now() - delayMs);
 
   // Find active conversations where:
   // 1. No follow-up has been sent yet
   // 2. The last message is from the CUSTOMER (AI should not double-message)
   // 3. The last customer message is older than the configured delay
+  // orderBy createdAt desc so index 0 = most recent
   const conversations = await db.conversation.findMany({
-    where: {
-      workspaceId,
-      status: "ACTIVE",
-      followUpSentAt: null,
-      messages: {
-        some: {
-          role: "USER",
-        },
-      },
-    },
-    include: {
-      messages: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-      contact: true,
-    },
+    where: { workspaceId, status: "ACTIVE", followUpSentAt: null },
+    include: { messages: true, contact: true },
   });
 
-  for (const conv of conversations) {
-    const lastMsg = conv.messages[0];
-    if (!lastMsg || lastMsg.role !== "USER") continue;
-
-    // Only follow up if the last customer message is old enough
-    if (lastMsg.createdAt > cutoff) continue;
+  for (const _convRaw of conversations) {
+    const conv = _convRaw as unknown as Record<string, unknown> & { id: string; channel: string; channelId?: string };
+    const messages = (conv.messages as Record<string, unknown>[] | undefined) ?? [];
+    const contact = _convRaw.contact as Record<string, unknown> | undefined;
+    const recentUserMsg = messages
+      .filter(m => (m.role as string) === "USER")
+      .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime())[0];
+    if (!recentUserMsg) continue;
+    if (new Date(recentUserMsg.createdAt as string) > cutoff) continue;
 
     // Use workspace message template, or a sensible default
-    const baseMessage = workspace.followUpMessage?.trim()
-      || "Hi! Just checking in — are you still there? I'd love to help if you have any questions. 😊";
-
+    const baseMessage = ((workspace.followUpMessage as string | undefined)?.trim() || "Hi! Just checking in — are you still there? I'd love to help if you have any questions. 😊");
     let finalMessage = baseMessage;
 
     // If AI guidance is provided, ask the AI to tailor the message
-    if (workspace.followUpInstructions?.trim()) {
+    if ((workspace.followUpInstructions as string | undefined)?.trim()) {
       const contactName =
-        (conv.contact?.profile as Record<string, string>)?.name ?? "there";
+        (contact?.profile as Record<string, string>)?.name ?? "there";
 
       const systemPrompt = `You are a helpful sales assistant. The customer's name is "${contactName}".`;
       const userPrompt = `Based on this conversation context, write a short, friendly follow-up message (max 2 sentences) to send to the customer. Do NOT be pushy. Do NOT mention "AI" or "automated".
