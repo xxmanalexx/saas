@@ -40,9 +40,9 @@ export async function aiComplete(
         messages,
         temperature: options?.temperature ?? 0.7,
         stream: false,
-        // Keep model loaded for 5 minutes after this request completes
-        // so the next message doesn't wait for a cold load
-        keep_alive: 5 * 60,
+        // keep_alive: -1 means the model stays loaded indefinitely after this request.
+        // This eliminates the cold-start delay on every new message.
+        keep_alive: -1,
         // Disable extended thinking if user turned it off in settings
         ...(options?.thinking === false && { think: false }),
       }),
