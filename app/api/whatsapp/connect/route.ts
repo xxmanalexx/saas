@@ -7,7 +7,7 @@ import { getOllamaConfig } from "@/lib/ollamaConfig";
 import { transcribeAudio } from "@/lib/whisperTranscriber";
 import { triggerFollowUps } from "@/lib/triggerFollowUps";
 import type { AiMessage } from "@/lib/ai";
-import type { Channel } from "@prisma/client";
+import type { Channel } from "@/generated/prisma";
 
 // POST /api/whatsapp/connect
 // Starts the WhatsApp Baileys socket and wires up AI message processing.

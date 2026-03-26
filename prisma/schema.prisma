@@ -1,6 +1,6 @@
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -55,9 +55,9 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  workspaces  Workspace[]
+  accounts   Account[]
+  sessions   Session[]
+  workspaces Workspace[]
 }
 
 enum Plan {
@@ -68,39 +68,39 @@ enum Plan {
 }
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  userId    String
-  settings  Json     @default("{}")
-  // Ollama AI config
-  ollamaUrl    String   @default("http://localhost:11434")
-  ollamaModel  String   @default("llama3.2")
-  // Whether to allow extended thinking (default true — set false to disable)
-  ollamaThinking Boolean @default(true)
-  // Optional custom database connection string (overrides env DATABASE_URL)
-  databaseUrl  String?  @default("")
+  id       String @id @default(cuid())
+  name     String
+  userId   String
+  settings Json   @default("{}")
 
-  // Database provider: "postgresql" (Neon/remote) or "sqlite" (local zero-setup)
-  databaseProvider String @default("postgresql")
+  // Ollama AI config
+  ollamaUrl      String  @default("http://localhost:11434")
+  ollamaModel    String  @default("llama3.2")
+  ollamaThinking Boolean @default(true)
+
+  // Optional custom database connection string (overrides env DATABASE_URL)
+  databaseUrl String? @default("")
+
+databaseProvider String @default("postgresql")
 
   // Follow-up config
-  followUpEnabled       Boolean @default(false)
-  followUpDelayMinutes  Int     @default(300) // 5 hours after last customer message
-  followUpInstructions  String  @default("")
-  followUpMessage       String  @default("") // the actual follow-up message template
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  followUpEnabled      Boolean  @default(false)
+  followUpDelayMinutes Int      @default(300)
+  followUpInstructions String   @default("")
+  followUpMessage      String   @default("")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agents         Agent[]
-  conversations  Conversation[]
-  contacts       Contact[]
-  leads          Lead[]
-  flows          Flow[]
-  integrations   Integration[]
-  transcripts    Transcript[]
-  knowledgeBase  KnowledgeBase[]
-  personas       AgentPersona[]
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agents        Agent[]
+  conversations Conversation[]
+  contacts      Contact[]
+  leads         Lead[]
+  flows         Flow[]
+  integrations  Integration[]
+  transcripts   Transcript[]
+  knowledgeBase KnowledgeBase[]
+  personas      AgentPersona[]
 }
 
 model Agent {
@@ -113,7 +113,7 @@ model Agent {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   messages  AgentMessage[]
   logs      AgentLog[]
 }
@@ -129,20 +129,20 @@ enum AgentType {
 // ─── Conversation & Messaging ────────────────────────────────────────────────
 
 model Conversation {
-  id           String            @id @default(cuid())
-  workspaceId  String
-  channel      Channel
-  channelId    String            // WhatsApp message ID, IG recipient, web chat session ID, etc.
-  contactId    String?
-  status       ConversationStatus @default(ACTIVE)
-  assignedTo   String?           // human agent ID if escalated
-  followUpSentAt DateTime?       // timestamp when auto follow-up was sent
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id             String             @id @default(cuid())
+  workspaceId    String
+  channel        Channel
+  channelId      String
+  contactId      String?
+  status         ConversationStatus @default(ACTIVE)
+  assignedTo     String?
+  followUpSentAt DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
-  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  contact  Contact?     @relation(fields: [contactId], references: [id])
-  messages Message[]
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact    Contact?    @relation(fields: [contactId], references: [id])
+  messages   Message[]
   transcript Transcript?
 
   @@unique([workspaceId, channel, channelId])
@@ -199,31 +199,31 @@ model Contact {
   workspaceId       String
   channel           Channel
   channelIdentifier String
-  profile           Json     @default("{}") // name, avatar, etc.
+  profile           Json     @default("{}")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  conversations  Conversation[]
-  leads          Lead[]
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  leads         Lead[]
 
   @@unique([workspaceId, channel, channelIdentifier])
 }
 
 model Lead {
-  id          String     @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   contactId   String
-  score       Int        @default(0) // 0-100
-  stage       LeadStage  @default(NEW)
-  ownerId     String?    // sales rep user ID
-  notes       String?    @db.Text
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  score       Int       @default(0)
+  stage       LeadStage @default(NEW)
+  ownerId     String?
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  contact  Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  events   LeadEvent[]
+  contact   Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  events    LeadEvent[]
 }
 
 enum LeadStage {
@@ -239,7 +239,7 @@ enum LeadStage {
 model LeadEvent {
   id        String   @id @default(cuid())
   leadId    String
-  type      String   // stage_change, note_added, email_sent, call_logged
+  type      String
   data      Json     @default("{}")
   createdAt DateTime @default(now())
 
@@ -249,25 +249,25 @@ model LeadEvent {
 // ─── Flows ────────────────────────────────────────────────────────────────────
 
 model Flow {
-  id         String   @id @default(cuid())
+  id          String   @id @default(cuid())
   workspaceId String
-  name       String
-  trigger    String   // event that starts this flow (e.g. "new_lead", "keyword:pricing")
-  nodes      Json     @default("[]") // array of FlowNode objects
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  name        String
+  trigger     String
+  nodes       Json     @default("[]")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   runs      FlowRun[]
 }
 
 model FlowRun {
-  id        String     @id @default(cuid())
+  id        String        @id @default(cuid())
   flowId    String
   contactId String
   status    FlowRunStatus @default(RUNNING)
-  startedAt DateTime   @default(now())
+  startedAt DateTime      @default(now())
   endedAt   DateTime?
 
   flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
@@ -283,14 +283,14 @@ enum FlowRunStatus {
 // ─── Integrations ─────────────────────────────────────────────────────────────
 
 model Integration {
-  id           String           @id @default(cuid())
-  workspaceId  String
-  channel      Channel
-  credentials  Json             @default("{}") // encrypted
-  status       IntegrationStatus @default(DISCONNECTED)
-  settings     Json             @default("{}")
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id          String            @id @default(cuid())
+  workspaceId String
+  channel     Channel
+  credentials Json              @default("{}")
+  status      IntegrationStatus @default(DISCONNECTED)
+  settings    Json              @default("{}")
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -336,7 +336,7 @@ model KnowledgeBase {
   workspaceId String
   title       String
   content     String   @db.Text
-  category    String   @default("general") // general, faq, pricing, policy, product
+  category    String   @default("general")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -347,18 +347,18 @@ model KnowledgeBase {
 // ─── Agent Persona ─────────────────────────────────────────────────────────────
 
 model AgentPersona {
-  id          String      @id @default(cuid())
-  workspaceId String
-  name        String
-  role        PersonaRole @default(SUPPORT)
-  tone        PersonaTone @default(FRIENDLY)
-  language    String      @default("en") // en, ar, hi, fr, etc.
-  dialect     String      @default("")   // khaliji, iraqi, shami, egyptian, maghrebi, saudi, or empty
-  emojiStyle  EmojiStyle  @default(SOMETIMES)
-  instructions String    @db.Text @default("")
-  isDefault   Boolean     @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String      @id @default(cuid())
+  workspaceId  String
+  name         String
+  role         PersonaRole @default(SUPPORT)
+  tone         PersonaTone @default(FRIENDLY)
+  language     String      @default("en")
+  dialect      String      @default("")
+  emojiStyle   EmojiStyle  @default(SOMETIMES)
+  instructions String      @db.Text @default("")
+  isDefault    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

@@ -6,7 +6,7 @@ import { bookingAgent } from "@/agents/BookingAgent";
 import { getOllamaConfig } from "@/lib/ollamaConfig";
 import { triggerFollowUps } from "@/lib/triggerFollowUps";
 import type { AiMessage } from "@/lib/ai";
-import type { AgentType, AgentPersona, Channel, Conversation, Contact } from "@prisma/client";
+import type { AgentType, AgentPersona, Channel, Conversation, Contact } from "@/generated/prisma";
 
 // ─── Persona context builder ─────────────────────────────────────────────────
 // Turns DB fields into concrete behavioral instructions the model follows.
@@ -317,7 +317,7 @@ export async function processMessage(
     select: { messages: true },
   });
   const allMessages = existing
-    ? [...(JSON.parse(existing.messages) as object[]), ...newMessages]
+    ? [...((typeof existing.messages === "string" ? JSON.parse(existing.messages) : existing.messages) as object[]), ...newMessages]
     : newMessages;
   await db.transcript.upsert({
     where: { conversationId: conversation.id },

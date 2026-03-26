@@ -1,6 +1,6 @@
 import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
 import { db } from "@/lib/db";
-import type { Contact } from "@prisma/client";
+import type { Contact } from "@/generated/prisma";
 
 export interface QualificationResult {
   score: number;

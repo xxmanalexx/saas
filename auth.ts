@@ -1,8 +1,8 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { db, getPrismaDb } from "@/lib/db";
-import type { PrismaClient } from "@prisma/client";
+import { db, getPrismaDb } from "@/src/lib/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 
 // Use NEXTAUTH_SECRET env var, or fall back to a dev-only value with a warning
 function getSecret(): string {

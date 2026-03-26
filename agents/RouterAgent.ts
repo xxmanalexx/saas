@@ -1,5 +1,5 @@
 import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
-import type { AgentType } from "@prisma/client";
+import type { AgentType } from "@/generated/prisma";
 
 export interface RouterDecision {
   intent: string;

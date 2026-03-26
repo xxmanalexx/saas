@@ -1,6 +1,6 @@
 import { aiComplete, type AiMessage, type AiOptions } from "@/lib/ai";
 import { db } from "@/lib/db";
-import type { Contact, Conversation } from "@prisma/client";
+import type { Contact, Conversation } from "@/generated/prisma";
 import { aiCompleteSimple } from "@/lib/ai";
 
 export interface BookingResult {
