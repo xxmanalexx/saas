@@ -4,18 +4,29 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db, getPrismaDb } from "@/lib/db";
 import type { PrismaClient } from "@prisma/client";
 
+// Use NEXTAUTH_SECRET env var, or fall back to a dev-only value with a warning
+function getSecret(): string {
+  if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("NEXTAUTH_SECRET environment variable is required in production.");
+  }
+  console.warn("[auth] WARNING: NEXTAUTH_SECRET not set. Using a temporary dev secret. Set it in .env for production.");
+  return "dev-only-temp-secret-do-not-use-in-production";
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: getSecret(),
   adapter: PrismaAdapter(getPrismaDb() as PrismaClient),
   providers: [
     GitHub({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      clientId: process.env.GITHUB_CLIENT_ID ?? "",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
     }),
   ],
   callbacks: {
     session({ session, user }) {
       if (session.user) {
-        session.user.id = user.id;
+        (session.user as { id?: string }).id = user.id;
       }
       return session;
     },
@@ -36,7 +47,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
 
         // Seed default persona so agents always have personaContext
-        const defaultPersona = await db.agentPersona.create({
+        await db.agentPersona.create({
           data: {
             workspaceId: workspace.id,
             name: "Rana",
