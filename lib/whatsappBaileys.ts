@@ -162,6 +162,15 @@ export async function getOrCreateSocket(
       console.log(`[Baileys] msg upsert | jid="${rawJid}" | text="${rawText}" | types="${msgTypes}" | fromMe=${m.key?.fromMe}`);
 
       if (m.key?.fromMe) continue;
+      // Reject status broadcasts, newsletters, and group messages early — before any processing
+      const rawJid = m.key?.remoteJid ?? "";
+      const isGroup = rawJid.includes("@g.us");
+      const isNewsletter = rawJid.includes("@newsletter");
+      const isStatus = rawJid.endsWith("@status.broadcast");
+      if (isGroup || isNewsletter || isStatus) {
+        console.log(`[Baileys] BLOCKED ${isStatus ? "status broadcast" : isNewsletter ? "newsletter" : "group"}: ${rawJid}`);
+        continue;
+      }
       if (!rawText && !m.message?.imageMessage && !m.message?.videoMessage && !m.message?.audioMessage) continue;
 
       const audioMessage = m.message?.audioMessage;
